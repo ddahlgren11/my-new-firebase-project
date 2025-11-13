@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+
 
 // TODO: Replace with your web app's Firebase configuration.
 // You can get this from the Firebase console, or by running:
@@ -22,6 +22,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const functions = getFunctions(app);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 // Connect to emulators if running locally
 if (window.location.hostname === "localhost") {
@@ -33,4 +34,5 @@ if (window.location.hostname === "localhost") {
   console.log("Production mode: Connecting to live Firebase services.");
 }
 
-export { app, db, functions, auth };
+export { app, db, functions, auth, googleProvider};
+  
