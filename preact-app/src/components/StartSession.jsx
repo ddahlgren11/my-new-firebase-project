@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { api } from "../api";
 
 export function StartSession({ roomId, onSessionStarted }) {
+  console.log("StartSession component rendering");
   const [mode, setMode] = useState("pomodoro");
 
   async function handleStart() {

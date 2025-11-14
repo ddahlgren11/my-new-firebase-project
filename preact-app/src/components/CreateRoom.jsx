@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { api } from "../api";
 
 export function CreateRoom({ onRoomCreated }) {
+  console.log("CreateRoom component rendering");
   const [name, setName] = useState("");
 
   async function handleSubmit(e) {
@@ -12,7 +13,7 @@ export function CreateRoom({ onRoomCreated }) {
       if (typeof onRoomCreated === 'function') {
         onRoomCreated(newRoom);
       }
-      setName("");
+      setName(""); 
     } catch (err) {
       console.error("Failed to create room:", err.message);
     }

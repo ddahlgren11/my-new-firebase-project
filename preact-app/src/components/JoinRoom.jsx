@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import { api } from "../api";
 
 export function JoinRoom({ onRoomJoined }) {
+  console.log("JoinRoom component rendering");
   const [inviteCode, setInviteCode] = useState("");
 
   async function handleSubmit(e) {
