@@ -1,46 +1,57 @@
 // src/api.js
 import { getAuth } from "firebase/auth";
+import { functions } from "./firebase"; // Import the functions instance
+import { httpsCallable } from "firebase/functions"; // Import the callable function utility
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+// We no longer need fetchWithAuth, as httpsCallable handles token injection and routing.
 
-async function fetchWithAuth(endpoint, options = {}) {
-  const user = getAuth().currentUser;
-  if (!user) throw new Error("User not authenticated");
+// --- Define the Callable Functions ---
+// The string argument is the name of the function you deploy (e.g., 'getRooms' in your functions/index.js)
+const getRoomsCallable = httpsCallable(functions, 'getRooms');
+const createRoomCallable = httpsCallable(functions, 'createRoom');
+const joinRoomCallable = httpsCallable(functions, 'joinRoom');
+const startSessionCallable = httpsCallable(functions, 'startSession');
 
-  const token = await user.getIdToken();
-
-  const headers = {
-    ...(options.headers || {}),
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-  if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-// Export reusable API calls (replace with your endpoints)
+// --- Export reusable API calls ---
 export const api = {
-  getRooms: () => fetchWithAuth("/api/rooms"),
-  createRoom: (data) =>
-    fetchWithAuth("/api/rooms", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  joinRoom: (inviteCode) =>
-    fetchWithAuth("/api/rooms/join", {
-      method: "POST",
-      body: JSON.stringify({ inviteCode }),
-    }),
-  startSession: (roomId, mode) =>
-    fetchWithAuth(`/api/rooms/${roomId}/sessions`, {
-      method: "POST",
-      body: JSON.stringify({ mode }),
-    }),
+  // getRooms: Calls the 'getRooms' function. No data passed in the request body.
+  getRooms: async () => {
+    // Call the function and return the result.data (which contains the array of rooms)
+    const result = await getRoomsCallable();
+    return result.data;
+  },
+  
+  // createRoom: Calls the 'createRoom' function, passing the room data as the request body.
+  createRoom: async (data) => {
+    const result = await createRoomCallable(data);
+    return result.data;
+  },
+  
+  // joinRoom: Calls the 'joinRoom' function, passing the invite code as the request body.
+  joinRoom: async (inviteCode) => {
+    const result = await joinRoomCallable({ inviteCode }); // Callable functions take a single object payload
+    return result.data;
+  },
+  
+  // startSession: Calls the 'startSession' function.
+  startSession: async (roomId, mode) => {
+    const result = await startSessionCallable({ roomId, mode });
+    return result.data;
+  },
+  
+  // Placeholder for getFriends and getFriendActivity (assuming they will also be callable functions)
+  getFriends: async (userId) => {
+    // You'd typically call a function like 'getFriendsList' here
+    // return (await httpsCallable(functions, 'getFriendsList')({ userId })).data;
+    console.warn("MOCK: getFriends using placeholder data.");
+    return [
+        { id: 'f1', name: 'Alex Focus', status: 'in-session' },
+        { id: 'f2', name: 'Ben Chill', status: 'offline' },
+    ];
+  },
+  
+  getFriendActivity: async (friendId) => {
+    console.warn("MOCK: getFriendActivity using placeholder data.");
+    return { completedSessions: 5, nudgesReceived: 2 };
+  },
 };

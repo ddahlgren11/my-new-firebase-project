@@ -13,6 +13,15 @@ export function App() {
   const [activePage, setActivePage] = useState('rooms');
 
   useEffect(() => {
+    // 🛑 CRITICAL FIX: Check if the 'auth' instance is available before subscribing.
+    if (!auth) {
+        console.error("Firebase Auth instance is null. Skipping authentication listeners.");
+        // Set loading to false so the app can show the Login screen or an error.
+        setLoading(false);
+        // We return an empty cleanup function since no subscription was made.
+        return () => {};
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
