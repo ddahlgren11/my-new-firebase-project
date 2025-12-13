@@ -1,327 +1,142 @@
 /**
  * Firebase Functions v2 HTTPS API for Procrastinot
- * Implementing endpoints from the OpenAPI 3.0.3 spec you provided.
+ * Implementing endpoints for frontend usage via httpsCallable.
  */
 
 const { setGlobalOptions } = require("firebase-functions");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 setGlobalOptions({ maxInstances: 10 });
 
-// --- Helpers --------------------------------------------------
+// Import Data Layer (Local copy for deployment compatibility)
+// Note: dataLayer now uses admin.firestore(), so admin must be initialized first (which it is above).
+const {
+  roomRepo,
+  sessionRepo,
+  userRepo,
+  membershipRepo
+} = require("./dataLayer.js");
 
-async function getAuthUser(req) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    logger.info("Found Authorization Token:", { token });
-    // TODO: use admin.auth().verifyIdToken(token)
-    return { message: "Token found and logged" };
+
+// --- Helper to get user ID ---
+function getUserId(request) {
+  // In a real app with Firebase Auth, use request.auth.uid
+  if (request.auth) {
+    return request.auth.uid;
   }
-  return null;
+  // Fallback for development/unauthenticated
+  return "default_user";
 }
 
-function generateId(prefix) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
-}
+// =====================================================================
+// getRooms
+// =====================================================================
+exports.getRooms = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("getRooms called", { userId });
 
-// --- Main API Function ----------------------------------------
+  // Use the new getAllRooms method (or getRoomsForUser if implemented fully)
+  // Since createRoom and getRooms are async now, we must await them.
+  const rooms = await roomRepo.getAllRooms();
 
-exports.api = onRequest(async (request, response) => {
-  // CORS
-  response.set("Access-Control-Allow-Origin", "http://localhost:5173");
-  response.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PATCH, DELETE, OPTIONS"
-  );
-  response.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  return rooms;
+});
 
-  if (request.method === "OPTIONS") {
-    response.status(204).send("");
-    return;
+// =====================================================================
+// createRoom
+// =====================================================================
+exports.createRoom = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { name, description } = request.data;
+
+  logger.info("createRoom called", { userId, name });
+
+  if (!name) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'name' argument.");
   }
 
-  // Log / auth
-  await getAuthUser(request);
+  // Create the room
+  const newRoom = await roomRepo.createRoom({
+    name,
+    description: description || "",
+    ownerId: userId
+  });
 
-  const { method, body } = request;
-  const path = request.path || "/";
-  const segments = path.split("/").filter(Boolean); // e.g. "/rooms/abc" -> ["rooms","abc"]
+  // Automatically add the creator as a member
+  await membershipRepo.createMembership({
+    roomId: newRoom.id,
+    userId: userId,
+    role: "admin"
+  });
 
-  logger.info("Incoming request", { method, path, body, segments });
+  return newRoom;
+});
 
-  // =====================================================================
-  // POST /rooms  (Create a Room)
-  // =====================================================================
-  if (method === "POST" && segments.length === 1 && segments[0] === "rooms") {
-    const { name, description, users } = body || {};
+// =====================================================================
+// joinRoom
+// =====================================================================
+exports.joinRoom = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { inviteCode } = request.data;
 
-    if (!name) {
-      return response.status(400).json({ message: "Missing required field: name" });
-    }
+  logger.info("joinRoom called", { userId, inviteCode });
 
-    const roomId = generateId("room");
-    const room = {
-      roomId,
-      name,
-      description: description || "",
-      users: Array.isArray(users) ? users : [],
-      owner: "owner_default", // stub owner
-      inviteCode: "INV" + Math.random().toString(36).slice(2, 6).toUpperCase()
-    };
+  // Mock implementation: If inviteCode matches a room ID, join it.
+  const room = await roomRepo.getRoomById(inviteCode);
 
-    return response.status(201).json(room);
+  if (!room) {
+      throw new HttpsError("not-found", "Room not found or invalid invite code.");
   }
 
-  // =====================================================================
-  // POST /rooms/{roomId}/memberships  (Join a Room)
-  // =====================================================================
-  if (
-    method === "POST" &&
-    segments.length === 3 &&
-    segments[0] === "rooms" &&
-    segments[2] === "memberships"
-  ) {
-    const roomId = segments[1];
-    const { inviteCode } = body || {};
+  // Check if already a member
+  const existingMembers = await membershipRepo.getMembers(room.id);
+  const isMember = existingMembers.some(m => m.userId === userId);
 
-    if (!inviteCode) {
-      return response.status(400).json({ message: "Missing inviteCode" });
-    }
-
-    // Stub success path
-    const room = {
-      roomId,
-      name: "Sample Room",
-      description: "Joined via invite code",
-      users: ["user_123", "user_456"],
-      owner: "user_123",
-      inviteCode
-    };
-
-    return response.status(200).json(room);
+  if (isMember) {
+     // Already joined, just return the room
+     return room;
   }
 
-  // =====================================================================
-  // GET /users/{userId}/rooms  (List Rooms a User Is In)
-  // =====================================================================
-  if (
-    method === "GET" &&
-    segments.length === 3 &&
-    segments[0] === "users" &&
-    segments[2] === "rooms"
-  ) {
-    const userId = segments[1];
+  await membershipRepo.createMembership({
+    roomId: room.id,
+    userId: userId,
+    role: "member"
+  });
 
-    // Stub: pretend user exists and is in two rooms
-    const rooms = [
-      {
-        roomId: "room_1",
-        name: "Morning Focus",
-        description: "Get work done before noon",
-        users: [userId, "friend_1"],
-        owner: userId,
-        inviteCode: "AB12CD"
-      },
-      {
-        roomId: "room_2",
-        name: "Night Owls",
-        description: "Late-night study session",
-        users: [userId, "friend_2"],
-        owner: "friend_2",
-        inviteCode: "EF34GH"
-      }
-    ];
+  return room;
+});
 
-    return response.status(200).json(rooms);
+// =====================================================================
+// startSession
+// =====================================================================
+exports.startSession = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { roomId, mode, name, description, duration } = request.data;
+
+  logger.info("startSession called", { userId, roomId, mode });
+
+  if (!roomId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'roomId' argument.");
   }
 
-  // =====================================================================
-  // POST /rooms/{roomId}/sessions  (Start a Session)
-  // =====================================================================
-  if (
-    method === "POST" &&
-    segments.length === 3 &&
-    segments[0] === "rooms" &&
-    segments[2] === "sessions"
-  ) {
-    const roomId = segments[1];
-    const { owner, name, startTime, mode, duration, description } = body || {};
-
-    if (!owner || !name || !startTime || !mode || typeof duration !== "number") {
-      return response.status(400).json({
-        message:
-          "Missing required fields: owner, name, startTime, mode, duration"
-      });
-    }
-
-    const sessionId = generateId("session");
-    const session = {
-      sessionId,
-      owner,
-      name,
-      startTime,
-      mode,
-      duration,
-      description: description || ""
-    };
-
-    // In a real impl, you’d store roomId + sessionId mapping in Firestore
-    logger.info("Session created for room", { roomId, session });
-
-    return response.status(201).json(session);
+  // Verify room exists
+  const room = await roomRepo.getRoomById(roomId);
+  if (!room) {
+    throw new HttpsError("not-found", "Room not found.");
   }
 
-  // =====================================================================
-  // POST /rooms/{roomId}/sessions/{sessionId}/users  (Join a Session)
-  // =====================================================================
-  if (
-    method === "POST" &&
-    segments.length === 5 &&
-    segments[0] === "rooms" &&
-    segments[2] === "sessions" &&
-    segments[4] === "users"
-  ) {
-    const roomId = segments[1];
-    const sessionId = segments[3];
-    const { tasks } = body || {};
+  const newSession = await sessionRepo.createSession({
+    roomId,
+    userId,
+    mode: mode || "pomodoro",
+    name: name || "",
+    description: description || "",
+    durationMinutes: duration || 25,
+    startTime: Date.now()
+  });
 
-    // tasks is optional in spec, we'll just convert to TaskList
-    const taskList = {
-      tasks: Array.isArray(tasks)
-        ? tasks.map((name) => ({
-            taskId: generateId("task"),
-            name,
-            complete: false
-          }))
-        : []
-    };
-
-    logger.info("User joined session", { roomId, sessionId, taskList });
-
-    return response.status(200).json(taskList);
-  }
-
-  // =====================================================================
-  // PATCH /rooms/{roomId}/sessions/{sessionId}/users/{userId}
-  //      (Update User Progress in Session)
-  // =====================================================================
-  if (
-    method === "PATCH" &&
-    segments.length === 6 &&
-    segments[0] === "rooms" &&
-    segments[2] === "sessions" &&
-    segments[4] === "users"
-  ) {
-    const roomId = segments[1];
-    const sessionId = segments[3];
-    const userId = segments[5];
-    const { tasks } = body || {};
-
-    if (!Array.isArray(tasks)) {
-      return response.status(400).json({ message: "tasks must be an array" });
-    }
-
-    // Basic validation to match TaskList schema
-    for (const t of tasks) {
-      if (
-        !t ||
-        typeof t.taskId !== "string" ||
-        typeof t.name !== "string" ||
-        typeof t.complete !== "boolean"
-      ) {
-        return response.status(400).json({
-          message: "Each task must have taskId (string), name (string), complete (boolean)"
-        });
-      }
-    }
-
-    const updatedTaskList = { tasks };
-
-    logger.info("Updated user progress", {
-      roomId,
-      sessionId,
-      userId,
-      updatedTaskList
-    });
-
-    return response.status(200).json(updatedTaskList);
-  }
-
-  // =====================================================================
-  // GET /rooms/{roomId}/sessions/{sessionId}  (Get Session Status)
-  // =====================================================================
-  if (
-    method === "GET" &&
-    segments.length === 4 &&
-    segments[0] === "rooms" &&
-    segments[2] === "sessions"
-  ) {
-    const roomId = segments[1];
-    const sessionId = segments[3];
-
-    // Stub SessionWithUsers
-    const session = {
-      sessionId,
-      owner: "owner_123",
-      name: "Deep Work Block",
-      startTime: new Date().toISOString(),
-      mode: "deep_work",
-      duration: 90,
-      description: `Session in room ${roomId}`
-    };
-
-    const users = [
-      { userId: "user_1", displayName: "Alice" },
-      { userId: "user_2", displayName: "Bob" }
-    ];
-
-    return response.status(200).json({ session, users });
-  }
-
-  // =====================================================================
-  // GET /users/{userId}/friends  (List Friends)
-  // =====================================================================
-  if (
-    method === "GET" &&
-    segments.length === 3 &&
-    segments[0] === "users" &&
-    segments[2] === "friends"
-  ) {
-    const userId = segments[1];
-
-    // Stub UserFriend list
-    const friends = [
-      {
-        name: "Alice",
-        status: "online",
-        activeSessions: [
-          {
-            sessionId: "session_a",
-            owner: userId,
-            name: "Morning Grind",
-            startTime: new Date().toISOString(),
-            mode: "pomodoro",
-            duration: 50,
-            description: "Short focus sprint"
-          }
-        ]
-      },
-      {
-        name: "Bob",
-        status: "offline",
-        activeSessions: []
-      }
-    ];
-
-    return response.status(200).json(friends);
-  }
-
-  // =====================================================================
-  // Fallback - Unknown route
-  // =====================================================================
-  return response.status(404).json({ message: "Unrecognized path." });
+  return newSession;
 });
