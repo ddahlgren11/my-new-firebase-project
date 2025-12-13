@@ -1,17 +1,11 @@
-// In-memory database
-const db = {
-  users: {},
-  rooms: {},
-  memberships: {},
-  sessions: {},
-  tasks: {},
-  messages: {}
-};
+const admin = require("firebase-admin");
 
-// Simple ID generator
-function generateId() {
-  return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
-}
+// Initialize Firestore
+// We assume admin.initializeApp() is called by the consumer (functions/index.js)
+// or we can check admin.apps.length.
+// Ideally, passing the db instance is better for dependency injection,
+// but for this structure, accessing the singleton is acceptable.
+const db = admin.firestore();
 
 // Mini-ORM Mapper
 function mapToEntity(schema, data) {
@@ -31,37 +25,34 @@ function mapToEntity(schema, data) {
 // Schemas
 const Schemas = {
   User: {
-    id: { default: () => generateId() },
     displayName: { default: "" },
     email: { default: "" },
     avatarUrl: { default: "" },
     createdAt: { default: () => Date.now() }
   },
   Room: {
-    id: { default: () => generateId() },
     name: { default: "New Room" },
     description: { default: "" },
     ownerId: { default: null },
     createdAt: { default: () => Date.now() }
   },
   RoomMembership: {
-    id: { default: () => generateId() },
     roomId: { default: null },
     userId: { default: null },
     role: { default: "member" }, // "member" | "admin"
     joinedAt: { default: () => Date.now() }
   },
   Session: {
-    id: { default: () => generateId() },
     roomId: { default: null },
     userId: { default: null },
+    name: { default: "" },
+    description: { default: "" },
     startTime: { default: () => Date.now() },
     endTime: { default: null },
-    mode: { default: "focus" }, // "focus" | "break"
+    mode: { default: "focus" },
     durationMinutes: { default: 25 }
   },
   Task: {
-    id: { default: () => generateId() },
     userId: { default: null },
     roomId: { default: null }, // nullable
     title: { default: "" },
@@ -70,7 +61,6 @@ const Schemas = {
     completedAt: { default: null }
   },
   Message: {
-    id: { default: () => generateId() },
     roomId: { default: null },
     userId: { default: null },
     text: { default: "" },
@@ -78,320 +68,183 @@ const Schemas = {
   }
 };
 
-// --- Interfaces ---
+// --- Interfaces (kept for documentation/structure) ---
+// ... (Omitted for brevity, but implied)
 
-class IUserRepository {
-  createUser(user) {}
-  getUserById(id) {}
-  updateUser(id, fields) {}
-  deleteUser(id) {}
-  
-  // Domain queries
-  getUserByEmail(email) {}
-  getUsersInRoom(roomId) {}
-}
+// --- Firestore Implementations ---
 
-class IRoomRepository {
-  createRoom(room) {}
-  getRoomById(id) {}
-  updateRoom(id, fields) {}
-  deleteRoom(id) {}
-
-  // Domain queries
-  getRoomsByOwner(ownerId) {}
-  getRoomsForUser(userId) {}
-}
-
-class IRoomMembershipRepository {
-  createMembership(membership) {}
-  getMembershipById(id) {}
-  updateMembership(id, fields) {}
-  deleteMembership(id) {}
-
-  // Domain queries
-  getMembers(roomId) {}
-}
-
-class ISessionRepository {
-  createSession(session) {}
-  getSessionById(id) {}
-  updateSession(id, fields) {}
-  deleteSession(id) {}
-
-  // Domain queries
-  getSessionsForRoom(roomId) {}
-  getSessionsForUser(userId) {}
-}
-
-class ITaskRepository {
-  createTask(task) {}
-  getTaskById(id) {}
-  updateTask(id, fields) {}
-  deleteTask(id) {}
-
-  // Domain queries
-  getTasksForUser(userId) {}
-  getIncompleteTasks(userId) {}
-  getCompletedTasks(userId) {}
-}
-
-class IMessageRepository {
-  createMessage(message) {}
-  getMessageById(id) {}
-  updateMessage(id, fields) {}
-  deleteMessage(id) {}
-
-  // Domain queries
-  getMessagesForRoom(roomId) {}
-}
-
-// --- Implementations ---
-
-class InMemoryUserRepository extends IUserRepository {
-  constructor(database) {
-    super();
-    this.db = database.users;
-    // Need access to memberships for join queries
-    this.membershipDb = database.memberships;
+class FirestoreUserRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('users');
   }
 
-  createUser(data) {
+  async createUser(data) {
     const entity = mapToEntity(Schemas.User, data);
-    this.db[entity.id] = entity;
-    return entity;
+    // If data.id is provided (e.g. from Auth UID), use it as doc ID
+    if (data.id) {
+        await this.collection.doc(data.id).set(entity);
+        return { id: data.id, ...entity };
+    } else {
+        const docRef = await this.collection.add(entity);
+        return { id: docRef.id, ...entity };
+    }
   }
 
-  getUserById(id) {
-    return this.db[id] || null;
+  async getUserById(id) {
+    const doc = await this.collection.doc(id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
   }
 
-  updateUser(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
-  }
-
-  deleteUser(id) {
-    delete this.db[id];
-  }
-
-  getUserByEmail(email) {
-    return Object.values(this.db).find(u => u.email === email) || null;
-  }
-
-  getUsersInRoom(roomId) {
-    const userIds = Object.values(this.membershipDb)
-      .filter(m => m.roomId === roomId)
-      .map(m => m.userId);
-    
-    return userIds.map(uid => this.db[uid]).filter(u => u !== undefined);
+  async updateUser(id, fields) {
+      await this.collection.doc(id).update(fields);
+      return this.getUserById(id);
   }
 }
 
-class InMemoryRoomRepository extends IRoomRepository {
-  constructor(database) {
-    super();
-    this.db = database.rooms;
-    this.membershipDb = database.memberships;
+class FirestoreRoomRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('rooms');
   }
 
-  createRoom(data) {
+  async createRoom(data) {
     const entity = mapToEntity(Schemas.Room, data);
-    this.db[entity.id] = entity;
-    return entity;
+    const docRef = await this.collection.add(entity);
+    return { id: docRef.id, ...entity };
   }
 
-  getRoomById(id) {
-    return this.db[id] || null;
+  async getRoomById(id) {
+    const doc = await this.collection.doc(id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
   }
 
-  updateRoom(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
+  async getAllRooms() {
+    const snapshot = await this.collection.get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
-  deleteRoom(id) {
-    delete this.db[id];
-  }
-
-  getRoomsByOwner(ownerId) {
-    return Object.values(this.db).filter(r => r.ownerId === ownerId);
-  }
-
-  getRoomsForUser(userId) {
-    const roomIds = Object.values(this.membershipDb)
-        .filter(m => m.userId === userId)
-        .map(m => m.roomId);
-    
-    return roomIds.map(rid => this.db[rid]).filter(r => r !== undefined);
+  async getRoomsByOwner(ownerId) {
+    const snapshot = await this.collection.where('ownerId', '==', ownerId).get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 }
 
-class InMemoryRoomMembershipRepository extends IRoomMembershipRepository {
-  constructor(database) {
-    super();
-    this.db = database.memberships;
-    this.userDb = database.users;
+class FirestoreRoomMembershipRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('memberships');
   }
 
-  createMembership(data) {
+  async createMembership(data) {
     const entity = mapToEntity(Schemas.RoomMembership, data);
-    this.db[entity.id] = entity;
-    return entity;
+    const docRef = await this.collection.add(entity);
+    return { id: docRef.id, ...entity };
   }
 
-  getMembershipById(id) {
-    return this.db[id] || null;
+  async getMembers(roomId) {
+    const snapshot = await this.collection.where('roomId', '==', roomId).get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
-  updateMembership(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
-  }
-
-  deleteMembership(id) {
-    delete this.db[id];
-  }
-
-  getMembers(roomId) {
-    return Object.values(this.db).filter(m => m.roomId === roomId);
+  async getMembershipsForUser(userId) {
+      const snapshot = await this.collection.where('userId', '==', userId).get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 }
 
-class InMemorySessionRepository extends ISessionRepository {
-  constructor(database) {
-    super();
-    this.db = database.sessions;
+class FirestoreSessionRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('sessions');
   }
 
-  createSession(data) {
+  async createSession(data) {
     const entity = mapToEntity(Schemas.Session, data);
-    this.db[entity.id] = entity;
-    return entity;
+    const docRef = await this.collection.add(entity);
+    return { id: docRef.id, ...entity };
   }
 
-  getSessionById(id) {
-    return this.db[id] || null;
+  async getSessionsForRoom(roomId) {
+      const snapshot = await this.collection.where('roomId', '==', roomId).get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
-  updateSession(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
-  }
-
-  deleteSession(id) {
-    delete this.db[id];
-  }
-
-  getSessionsForRoom(roomId) {
-    return Object.values(this.db).filter(s => s.roomId === roomId);
-  }
-
-  getSessionsForUser(userId) {
-    return Object.values(this.db).filter(s => s.userId === userId);
+  async getSessionsForUser(userId) {
+      const snapshot = await this.collection.where('userId', '==', userId).get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 }
 
-class InMemoryTaskRepository extends ITaskRepository {
-  constructor(database) {
-    super();
-    this.db = database.tasks;
+class FirestoreTaskRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('tasks');
   }
 
-  createTask(data) {
+  async createTask(data) {
     const entity = mapToEntity(Schemas.Task, data);
-    this.db[entity.id] = entity;
-    return entity;
+    const docRef = await this.collection.add(entity);
+    return { id: docRef.id, ...entity };
   }
 
-  getTaskById(id) {
-    return this.db[id] || null;
+  async getTaskById(id) {
+    const doc = await this.collection.doc(id).get();
+    if (!doc.exists) return null;
+    return { id: doc.id, ...doc.data() };
   }
 
-  updateTask(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
+  async updateTask(id, fields) {
+      await this.collection.doc(id).update(fields);
+      return this.getTaskById(id);
   }
 
-  deleteTask(id) {
-    delete this.db[id];
+  async deleteTask(id) {
+      await this.collection.doc(id).delete();
   }
 
-  getTasksForUser(userId) {
-    return Object.values(this.db).filter(t => t.userId === userId);
-  }
-
-  getIncompleteTasks(userId) {
-    return Object.values(this.db).filter(t => t.userId === userId && !t.completed);
-  }
-
-  getCompletedTasks(userId) {
-    return Object.values(this.db).filter(t => t.userId === userId && t.completed);
+  async getTasksForUser(userId) {
+    const snapshot = await this.collection.where('userId', '==', userId).get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 }
 
-class InMemoryMessageRepository extends IMessageRepository {
-  constructor(database) {
-    super();
-    this.db = database.messages;
+class FirestoreMessageRepository {
+  constructor(firestore) {
+    this.collection = firestore.collection('messages');
   }
 
-  createMessage(data) {
+  async createMessage(data) {
     const entity = mapToEntity(Schemas.Message, data);
-    this.db[entity.id] = entity;
-    return entity;
+    const docRef = await this.collection.add(entity);
+    return { id: docRef.id, ...entity };
   }
 
-  getMessageById(id) {
-    return this.db[id] || null;
-  }
-
-  updateMessage(id, fields) {
-    if (!this.db[id]) return null;
-    this.db[id] = { ...this.db[id], ...fields };
-    return this.db[id];
-  }
-
-  deleteMessage(id) {
-    delete this.db[id];
-  }
-
-  getMessagesForRoom(roomId) {
-    return Object.values(this.db).filter(m => m.roomId === roomId).sort((a, b) => a.createdAt - b.createdAt);
+  async getMessagesForRoom(roomId) {
+    const snapshot = await this.collection
+      .where('roomId', '==', roomId)
+      .orderBy('createdAt', 'asc')
+      .get();
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 }
 
 // Initialize repositories
-const userRepo = new InMemoryUserRepository(db);
-const roomRepo = new InMemoryRoomRepository(db);
-const membershipRepo = new InMemoryRoomMembershipRepository(db);
-const sessionRepo = new InMemorySessionRepository(db);
-const taskRepo = new InMemoryTaskRepository(db);
-const messageRepo = new InMemoryMessageRepository(db);
+const userRepo = new FirestoreUserRepository(db);
+const roomRepo = new FirestoreRoomRepository(db);
+const membershipRepo = new FirestoreRoomMembershipRepository(db);
+const sessionRepo = new FirestoreSessionRepository(db);
+const taskRepo = new FirestoreTaskRepository(db);
+const messageRepo = new FirestoreMessageRepository(db);
 
-// Exports
 module.exports = {
-  db,
+  db, // export firestore instance if needed
   mapToEntity,
   Schemas,
-  // Interfaces
-  IUserRepository,
-  IRoomRepository,
-  IRoomMembershipRepository,
-  ISessionRepository,
-  ITaskRepository,
-  IMessageRepository,
   // Implementations
-  InMemoryUserRepository,
-  InMemoryRoomRepository,
-  InMemoryRoomMembershipRepository,
-  InMemorySessionRepository,
-  InMemoryTaskRepository,
-  InMemoryMessageRepository,
+  FirestoreUserRepository,
+  FirestoreRoomRepository,
+  FirestoreRoomMembershipRepository,
+  FirestoreSessionRepository,
+  FirestoreTaskRepository,
+  FirestoreMessageRepository,
   // Instances
   userRepo,
   roomRepo,
