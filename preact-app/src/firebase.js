@@ -21,7 +21,8 @@ if (isCanvasEnv) {
   authToken =
     typeof __initial_auth_token !== "undefined" ? __initial_auth_token : null;
 } else {
-  // Normal Vite local dev (put your Firebase config in .env.*)
+  // Normal Vite local dev.
+  // We prioritize environment variables, but fallback to the user's provided keys if missing.
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
 
   if (apiKey) {
@@ -29,17 +30,19 @@ if (isCanvasEnv) {
       apiKey: apiKey,
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      // add storageBucket, messagingSenderId, etc. if you need them
     };
   } else {
-    // Fallback for emulator-only development (no env vars present)
-    console.warn("No Firebase env vars found. Using demo config for emulators.");
+    // User provided keys for local development
     firebaseConfig = {
-      apiKey: "demo-api-key",
-      authDomain: "demo-project.firebaseapp.com",
-      projectId: "demo-project",
-      appId: "demo-app-id",
+      apiKey: "AIzaSyC3w_aZojKeEp3llhJlKlVGj_rbOHAMhb0",
+      authDomain: "my-new-firebase-project-94e22.firebaseapp.com",
+      projectId: "my-new-firebase-project-94e22",
+      storageBucket: "my-new-firebase-project-94e22.firebasestorage.app",
+      messagingSenderId: "210118924526",
+      appId: "1:210118924526:web:c88671740e8b13e1e7fbff",
     };
   }
 }
@@ -92,18 +95,17 @@ if (
   dbInstance &&
   functionsInstance
 ) {
-  const usingDemoKeys = firebaseConfig.apiKey === "demo-api-key";
+  // Check if we are using the "demo" keys (legacy) or real keys
+  // Since we hardcoded real keys above, we are likely using real keys if env vars are missing.
+  // Typically, if using real keys, we want to hit the real Auth service for Google Login.
+  // But we might still want to use Firestore/Functions emulators if running locally.
 
-  // Connect to Firestore and Functions (safe on localhost)
-  connectFirestoreEmulator(dbInstance, "localhost", 8080);
-  connectFunctionsEmulator(functionsInstance, "localhost", 5001);
+  // Uncomment the following lines ONLY if you are running `firebase emulators:start`
+  // and want your localhost app to talk to them instead of the cloud.
 
-  // If we are using the demo key, we MUST connect to auth emulator.
-  // If we are using real keys, the user might prefer real Google Auth, so we leave it commented out by default unless usingDemoKeys is true.
-  if (usingDemoKeys) {
-    connectAuthEmulator(authInstance, "http://localhost:9099");
-  } else {
-    // Uncomment this if you want to force Auth emulator even with real keys
-    // connectAuthEmulator(authInstance, "http://localhost:9099");
-  }
+  // connectFirestoreEmulator(dbInstance, "localhost", 8080);
+  // connectFunctionsEmulator(functionsInstance, "localhost", 5001);
+  // connectAuthEmulator(authInstance, "http://localhost:9099");
+
+  console.log("Firebase: Running locally. Emulators are NOT connected by default to ensure Google Login works with real keys.");
 }
