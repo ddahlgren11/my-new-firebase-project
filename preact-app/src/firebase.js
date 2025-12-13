@@ -21,27 +21,15 @@ if (isCanvasEnv) {
   authToken =
     typeof __initial_auth_token !== "undefined" ? __initial_auth_token : null;
 } else {
-  // Normal Vite local dev (put your Firebase config in .env.*)
-  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-
-  if (apiKey) {
-    firebaseConfig = {
-      apiKey: apiKey,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      // add storageBucket, messagingSenderId, etc. if you need them
-    };
-  } else {
-    // Fallback for emulator-only development (no env vars present)
-    console.warn("No Firebase env vars found. Using demo config for emulators.");
-    firebaseConfig = {
-      apiKey: "demo-api-key",
-      authDomain: "demo-project.firebaseapp.com",
-      projectId: "demo-project",
-      appId: "demo-app-id",
-    };
-  }
+  // Normal Vite local dev (using hardcoded config as requested)
+  firebaseConfig = {
+    apiKey: "AIzaSyC3w_aZojKeEp3llhJlKlVGj_rbOHAMhb0",
+    authDomain: "my-new-firebase-project-94e22.firebaseapp.com",
+    projectId: "my-new-firebase-project-94e22",
+    storageBucket: "my-new-firebase-project-94e22.firebasestorage.app",
+    messagingSenderId: "210118924526",
+    appId: "1:210118924526:web:c88671740e8b13e1e7fbff",
+  };
 }
 
 let app = null;
