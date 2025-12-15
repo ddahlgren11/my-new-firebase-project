@@ -6,11 +6,12 @@ import { RoomsPage } from './components/RoomsPage';
 import { Nav } from './components/Nav';
 import { FriendsPage } from './components/FriendsPage';
 import { AccountabilityPage } from './components/AccountabilityPage';
+import { Dashboard } from './components/Dashboard';
 
 export function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activePage, setActivePage] = useState('rooms');
+  const [activePage, setActivePage] = useState('dashboard');
 
   useEffect(() => {
     // 🛑 CRITICAL FIX: Check if the 'auth' instance is available before subscribing.
@@ -32,17 +33,20 @@ export function App() {
   }, []);
 
   if (loading) {
-    return <div>Loading...</div>; // Or a spinner component
+    return <div class="min-h-screen flex items-center justify-center bg-gray-900 text-white">Loading...</div>;
   }
 
   return (
-    <main>
+    <main class="min-h-screen bg-gray-900 text-gray-100 font-sans">
       {user ? (
-        <div>
+        <div class="flex flex-col min-h-screen">
           <Nav activePage={activePage} setActivePage={setActivePage} />
-          {activePage === 'rooms' && <RoomsPage user={user} />}
-          {activePage === 'friends' && <FriendsPage user={user} />}
-          {activePage === 'accountability' && <AccountabilityPage user={user} />}
+          <div class="flex-grow">
+            {activePage === 'dashboard' && <Dashboard setActivePage={setActivePage} />}
+            {activePage === 'rooms' && <RoomsPage user={user} />}
+            {activePage === 'friends' && <FriendsPage user={user} />}
+            {activePage === 'accountability' && <AccountabilityPage user={user} />}
+          </div>
         </div>
       ) : (
         <Login />

@@ -27,16 +27,13 @@ export function RoomsPage({ user }) {
   }, []);
 
   const handleRoomAction = (updatedRoom) => {
-    // Check if the room already exists
     const roomIndex = rooms.findIndex((room) => room.id === updatedRoom.id);
 
     if (roomIndex > -1) {
-      // If room exists, update it (though for join/create it's more like an add)
       const updatedRooms = [...rooms];
       updatedRooms[roomIndex] = updatedRoom;
       setRooms(updatedRooms);
     } else {
-      // If room doesn't exist, add it to the list
       setRooms([...rooms, updatedRoom]);
     }
   };
@@ -49,36 +46,66 @@ export function RoomsPage({ user }) {
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
 
   return (
-    <div class="container mx-auto p-4">
-      <div class="flex space-x-4 mb-6">
-        <CreateRoom onRoomCreated={handleRoomAction} />
-        <JoinRoom onRoomJoined={handleRoomAction} />
+    <div class="container mx-auto p-6">
+      <div class="flex flex-col md:flex-row justify-between items-center mb-8">
+        <h2 class="text-3xl font-bold text-white mb-4 md:mb-0">Focus Rooms</h2>
+        <div class="flex space-x-4">
+          <CreateRoom onRoomCreated={handleRoomAction} />
+          <JoinRoom onRoomJoined={handleRoomAction} />
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <h3 class="text-xl font-semibold mb-3">My Rooms</h3>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-1">
+          <h3 class="text-xl font-semibold text-gray-300 mb-4 px-2">Your Rooms</h3>
           <ul class="space-y-3">
             {rooms.map((r) => (
               <li
                 key={r.id}
-                class={`p-4 border rounded-lg flex justify-between items-center shadow-sm cursor-pointer hover:bg-gray-100 ${
-                  selectedRoomId === r.id ? "bg-gray-200" : ""
+                class={`p-4 border border-gray-700 rounded-xl flex justify-between items-center cursor-pointer transition-all duration-200 ${
+                  selectedRoomId === r.id
+                    ? "bg-gray-700 border-indigo-500 shadow-md transform scale-105"
+                    : "bg-gray-800 hover:bg-gray-750 hover:border-gray-600"
                 }`}
                 onClick={() => setSelectedRoomId(r.id)}
               >
-                <span class="font-medium">{r.name}</span>
+                <div class="flex-grow">
+                    <span class="font-medium text-lg text-white block">{r.name}</span>
+                    <span class="text-xs text-gray-400">ID: {r.id}</span>
+                </div>
                 <StartSession
                   roomId={r.id}
                   onSessionStarted={handleSessionStarted}
                 />
               </li>
             ))}
+            {rooms.length === 0 && (
+                <div class="text-gray-500 text-center py-8 bg-gray-800 rounded-xl border border-gray-700 border-dashed">
+                    No rooms yet. Join or create one!
+                </div>
+            )}
           </ul>
         </div>
-        <div>
-          <h3 class="text-xl font-semibold mb-3">Room Details</h3>
-          <RoomDetails room={selectedRoom} user={user} />
+
+        <div class="lg:col-span-2">
+          {selectedRoom ? (
+            <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden min-h-[500px]">
+                <div class="p-6 border-b border-gray-700 bg-gray-850">
+                    <h3 class="text-2xl font-bold text-white">{selectedRoom.name}</h3>
+                    <p class="text-gray-400 text-sm mt-1">Room Details & Activity</p>
+                </div>
+                <div class="p-6">
+                    <RoomDetails room={selectedRoom} user={user} />
+                </div>
+            </div>
+          ) : (
+            <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex items-center justify-center min-h-[500px] text-gray-400">
+                <div class="text-center">
+                    <span class="text-6xl block mb-4">👈</span>
+                    <p class="text-xl">Select a room to view details</p>
+                </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
