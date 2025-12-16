@@ -17,7 +17,8 @@ const {
   roomRepo,
   sessionRepo,
   userRepo,
-  membershipRepo
+  membershipRepo,
+  friendshipRepo
 } = require("./dataLayer.js");
 
 
@@ -139,4 +140,157 @@ exports.startSession = onCall(async (request) => {
   });
 
   return newSession;
+});
+
+// =====================================================================
+// addFriend
+// =====================================================================
+exports.addFriend = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { friendCode, username, targetUserId } = request.data;
+
+  logger.info("addFriend called", { userId, friendCode, username, targetUserId });
+
+  if (!friendCode && !username && !targetUserId) {
+    throw new HttpsError("invalid-argument", "Must provide friendCode, username, or targetUserId.");
+  }
+
+  let targetUser = null;
+
+  if (targetUserId) {
+    // Direct add by ID (e.g. from suggestions)
+    targetUser = await userRepo.getUserById(targetUserId);
+  } else if (friendCode) {
+    // Search by friendCode
+    const snap = await userRepo.collection.where("friendCode", "==", friendCode).limit(1).get();
+    if (!snap.empty) {
+      targetUser = snap.docs[0].data();
+    }
+  } else if (username) {
+    // Exact match for username (displayName)
+    // Note: displayName is not unique, this picks the first one found.
+    const snap = await userRepo.collection.where("displayName", "==", username).limit(1).get();
+    if (!snap.empty) {
+      targetUser = snap.docs[0].data();
+    }
+  }
+
+  if (!targetUser) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+
+  if (targetUser.id === userId) {
+    throw new HttpsError("invalid-argument", "You cannot add yourself as a friend.");
+  }
+
+  // Check if already friends
+  const areFriends = await friendshipRepo.areFriends(userId, targetUser.id);
+  if (areFriends) {
+    throw new HttpsError("already-exists", "You are already friends with this user.");
+  }
+
+  // Create friendship
+  const friendship = await friendshipRepo.createFriendship({
+    userId1: userId,
+    userId2: targetUser.id,
+    status: "accepted" // Auto-accept for now
+  });
+
+  return { message: "Friend added", friend: targetUser };
+});
+
+// =====================================================================
+// getFriends
+// =====================================================================
+exports.getFriends = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("getFriends called", { userId });
+
+  const friendships = await friendshipRepo.getFriendshipsForUser(userId);
+
+  // Extract friend IDs
+  const friendIds = friendships.map(f => f.userId1 === userId ? f.userId2 : f.userId1);
+
+  if (friendIds.length === 0) {
+    return [];
+  }
+
+  // Fetch user details for friends
+  // Note: Parallel fetch is better
+  const friends = await Promise.all(friendIds.map(async (fid) => {
+    const user = await userRepo.getUserById(fid);
+    if (!user) return null;
+
+    // TODO: Determine real status (in-session, online, etc.)
+    // For now, check if they have an active session
+    const sessions = await sessionRepo.getSessionsForUser(fid);
+    const activeSession = sessions.find(s => !s.endTime); // Assuming endTime null means active, or check timestamp
+    // Actually our schema has durationMinutes and startTime, endTime is null usually until finished?
+    // Logic for active: startTime + duration > now.
+
+    let status = "offline";
+    if (activeSession) {
+       const elapsed = (Date.now() - activeSession.startTime) / 60000;
+       if (elapsed < activeSession.durationMinutes) {
+         status = "in-session";
+       }
+    }
+
+    return {
+      id: user.id,
+      name: user.displayName,
+      avatarUrl: user.avatarUrl,
+      status: status
+    };
+  }));
+
+  return friends.filter(f => f !== null);
+});
+
+// =====================================================================
+// getSuggestedFriends
+// =====================================================================
+exports.getSuggestedFriends = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("getSuggestedFriends called", { userId });
+
+  // 1. Get user's rooms
+  const myRooms = await roomRepo.getRoomsForUser(userId);
+  if (myRooms.length === 0) return [];
+
+  // 2. Get members of those rooms
+  const suggestedUserIds = new Set();
+
+  for (const room of myRooms) {
+    const members = await membershipRepo.getMembers(room.id);
+    for (const m of members) {
+      if (m.userId !== userId) {
+        suggestedUserIds.add(m.userId);
+      }
+    }
+  }
+
+  // 3. Filter out existing friends
+  const friendships = await friendshipRepo.getFriendshipsForUser(userId);
+  const friendIds = new Set(friendships.map(f => f.userId1 === userId ? f.userId2 : f.userId1));
+
+  const candidateIds = [...suggestedUserIds].filter(uid => !friendIds.has(uid));
+
+  // Limit suggestions
+  const limit = 5;
+  const limitedIds = candidateIds.slice(0, limit);
+
+  // 4. Fetch details
+  const suggestions = await Promise.all(limitedIds.map(async (uid) => {
+    const user = await userRepo.getUserById(uid);
+    return user ? {
+      id: user.id,
+      name: user.displayName,
+      avatarUrl: user.avatarUrl,
+      // Find a common room name to show "From Room X"
+      // Optimization: we could track which room we found them in during step 2
+    } : null;
+  }));
+
+  return suggestions.filter(u => u !== null);
 });
