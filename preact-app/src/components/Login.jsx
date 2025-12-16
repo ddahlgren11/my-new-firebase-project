@@ -1,5 +1,5 @@
 import { useState, useEffect } from "preact/hooks";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
 
 export function Login() {
@@ -29,6 +29,16 @@ export function Login() {
       } else {
         setError({ message: err.message });
       }
+    }
+  }
+
+  async function handleGuestLogin() {
+    setError(null);
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error("Guest login failed:", err);
+      setError({ message: "Guest login failed. Ensure Anonymous Auth is enabled in Firebase Console." });
     }
   }
 
@@ -69,6 +79,16 @@ export function Login() {
                 />
             </svg>
             <span>Sign in with Google</span>
+            </button>
+
+            <button
+            onClick={handleGuestLogin}
+            class="w-full bg-gray-700 text-white font-semibold px-4 py-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center space-x-3 shadow-md mt-4"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+                <span>Continue as Guest</span>
             </button>
 
             {error && (

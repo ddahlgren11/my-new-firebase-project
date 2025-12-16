@@ -14,8 +14,17 @@ const createTaskCallable = httpsCallable(functions, 'createTask');
 const getTasksCallable = httpsCallable(functions, 'getTasks');
 const updateTaskCallable = httpsCallable(functions, 'updateTask');
 const sendNudgeCallable = httpsCallable(functions, 'sendNudge');
+const syncUserCallable = httpsCallable(functions, 'syncUser');
 
 export const api = {
+  syncUser: async () => {
+    try {
+      await syncUserCallable();
+    } catch (e) {
+      console.warn("Failed to sync user profile", e);
+    }
+  },
+
   createTask: async (title, roomId) => {
     try {
         const result = await createTaskCallable({ title, roomId });

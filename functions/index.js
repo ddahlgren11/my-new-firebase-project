@@ -47,6 +47,50 @@ exports.getRooms = onCall(async (request) => {
 });
 
 // =====================================================================
+// syncUser
+// =====================================================================
+exports.syncUser = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("syncUser called", { userId });
+
+  if (userId === "default_user") {
+    // Cannot sync default user
+    return { success: false };
+  }
+
+  // Check if user exists
+  const existingUser = await userRepo.getUserById(userId);
+
+  // Get auth data if available
+  const authData = request.auth ? request.auth.token : {};
+  const displayName = authData.name || (authData.email ? authData.email.split('@')[0] : "Guest");
+  const avatarUrl = authData.picture || "";
+
+  if (!existingUser) {
+    // Create new user
+    await userRepo.createUser({
+      id: userId,
+      displayName,
+      email: authData.email || "",
+      avatarUrl
+    });
+    logger.info("Created new user profile", { userId });
+  } else {
+    // Update existing user if needed (optional, but good for keeping profile fresh)
+    // Only update if changed to save writes
+    const updates = {};
+    if (displayName && existingUser.displayName !== displayName) updates.displayName = displayName;
+    if (avatarUrl && existingUser.avatarUrl !== avatarUrl) updates.avatarUrl = avatarUrl;
+
+    if (Object.keys(updates).length > 0) {
+      await userRepo.updateUser(userId, updates);
+    }
+  }
+
+  return { success: true };
+});
+
+// =====================================================================
 // createRoom
 // =====================================================================
 exports.createRoom = onCall(async (request) => {
