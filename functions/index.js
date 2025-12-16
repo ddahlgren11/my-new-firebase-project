@@ -18,7 +18,8 @@ const {
   sessionRepo,
   userRepo,
   membershipRepo,
-  friendshipRepo
+  friendshipRepo,
+  taskRepo
 } = require("./dataLayer.js");
 
 
@@ -293,4 +294,95 @@ exports.getSuggestedFriends = onCall(async (request) => {
   }));
 
   return suggestions.filter(u => u !== null);
+});
+
+// =====================================================================
+// createTask
+// =====================================================================
+exports.createTask = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { title, roomId } = request.data;
+
+  logger.info("createTask called", { userId, title });
+
+  if (!title) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'title' argument.");
+  }
+
+  const newTask = await taskRepo.createTask({
+    userId,
+    roomId: roomId || null,
+    title,
+    completed: false
+  });
+
+  return newTask;
+});
+
+// =====================================================================
+// getTasks
+// =====================================================================
+exports.getTasks = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { roomId } = request.data || {};
+
+  logger.info("getTasks called", { userId, roomId });
+
+  // Use room filtering at DB level if room provided
+  let tasks;
+  if (roomId) {
+    tasks = await taskRepo.getTasksForRoom(userId, roomId);
+  } else {
+    tasks = await taskRepo.getTasksForUser(userId);
+  }
+
+  // Sort by created time
+  tasks.sort((a, b) => b.createdAt - a.createdAt);
+
+  return tasks;
+});
+
+// =====================================================================
+// updateTask
+// =====================================================================
+exports.updateTask = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { taskId, completed } = request.data;
+
+  logger.info("updateTask called", { userId, taskId, completed });
+
+  const task = await taskRepo.getTaskById(taskId);
+  if (!task) {
+    throw new HttpsError("not-found", "Task not found");
+  }
+
+  if (task.userId !== userId) {
+    throw new HttpsError("permission-denied", "You can only update your own tasks");
+  }
+
+  const updatedTask = await taskRepo.updateTask(taskId, {
+    completed,
+    completedAt: completed ? Date.now() : null
+  });
+
+  return updatedTask;
+});
+
+// =====================================================================
+// sendNudge
+// =====================================================================
+exports.sendNudge = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { friendId } = request.data;
+
+  logger.info("sendNudge called", { userId, friendId });
+
+  // In a real implementation, this would send a push notification or store a notification record.
+  // For now, we verify the user exists and return success.
+  const friend = await userRepo.getUserById(friendId);
+  if (!friend) {
+      throw new HttpsError("not-found", "Friend user not found");
+  }
+
+  return { success: true, message: `Nudged ${friend.displayName}!` };
 });

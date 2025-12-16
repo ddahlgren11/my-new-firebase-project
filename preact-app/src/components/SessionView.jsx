@@ -1,4 +1,5 @@
 import { useState, useEffect } from "preact/hooks";
+import { TaskManager } from "./TaskManager";
 
 export function SessionView({ session, room, onEndSession }) {
   const [timeLeft, setTimeLeft] = useState(session.durationMinutes * 60);
@@ -69,6 +70,10 @@ export function SessionView({ session, room, onEndSession }) {
           >
             End Session
           </button>
+        </div>
+
+        <div class="flex justify-center mt-8">
+            <TaskManager roomId={room.id} />
         </div>
       </div>
     </div>
