@@ -249,6 +249,35 @@ exports.joinSession = onCall(async (request) => {
 });
 
 // =====================================================================
+// leaveSession
+// =====================================================================
+exports.leaveSession = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { sessionId } = request.data;
+
+  logger.info("leaveSession called", { userId, sessionId });
+
+  if (!sessionId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'sessionId' argument.");
+  }
+
+  // Remove participant
+  await sessionParticipantRepo.removeParticipant(sessionId, userId);
+
+  // Check remaining participants
+  const participants = await sessionParticipantRepo.getParticipants(sessionId);
+
+  if (participants.length === 0) {
+    logger.info("Session empty, ending session", { sessionId });
+    await sessionRepo.updateSession(sessionId, {
+      endTime: Date.now()
+    });
+  }
+
+  return { success: true };
+});
+
+// =====================================================================
 // getSessionDetails
 // =====================================================================
 exports.getSessionDetails = onCall(async (request) => {
