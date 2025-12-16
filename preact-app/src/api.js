@@ -10,11 +10,55 @@ const startSessionCallable = httpsCallable(functions, 'startSession');
 const getFriendsCallable = httpsCallable(functions, 'getFriends');
 const addFriendCallable = httpsCallable(functions, 'addFriend');
 const getSuggestedFriendsCallable = httpsCallable(functions, 'getSuggestedFriends');
+const createTaskCallable = httpsCallable(functions, 'createTask');
+const getTasksCallable = httpsCallable(functions, 'getTasks');
+const updateTaskCallable = httpsCallable(functions, 'updateTask');
+const sendNudgeCallable = httpsCallable(functions, 'sendNudge');
 
 // Mock storage for session-lived friends
 const mockFriends = [];
 
 export const api = {
+  createTask: async (title, roomId) => {
+    try {
+        const result = await createTaskCallable({ title, roomId });
+        return result.data;
+    } catch (e) {
+        console.warn("Backend unavailable, using mock task");
+        return { id: 'mock-task-' + Date.now(), title, completed: false, roomId };
+    }
+  },
+
+  getTasks: async (roomId) => {
+    try {
+        const result = await getTasksCallable({ roomId });
+        return result.data;
+    } catch (e) {
+        console.warn("Backend unavailable, returning empty list");
+        return [];
+    }
+  },
+
+  updateTask: async (taskId, completed) => {
+    try {
+        const result = await updateTaskCallable({ taskId, completed });
+        return result.data;
+    } catch (e) {
+        console.warn("Backend unavailable, mocking success");
+        return { id: taskId, completed };
+    }
+  },
+
+  sendNudge: async (friendId) => {
+    try {
+        const result = await sendNudgeCallable({ friendId });
+        return result.data;
+    } catch (e) {
+         console.warn("Backend unavailable, mocking nudge");
+         return { success: true };
+    }
+  },
+
   getRooms: async () => {
     const result = await getRoomsCallable();
     return result.data;
@@ -36,9 +80,13 @@ export const api = {
   },
   
   getFriends: async (userId) => {
-    const result = await getFriendsCallable();
-    const realFriends = Array.isArray(result.data) ? result.data : [];
-    return [...realFriends, ...mockFriends];
+    try {
+        const result = await getFriendsCallable();
+        const realFriends = Array.isArray(result.data) ? result.data : [];
+        return [...realFriends, ...mockFriends];
+    } catch (e) {
+        return mockFriends;
+    }
   },
 
   addFriend: async ({ friendCode, username, targetUserId }) => {

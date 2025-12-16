@@ -1,7 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { api } from "../api";
 
-function FriendProgress({ friend }) {
+function FriendProgress({ friend, onNudge }) {
   const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,7 +46,10 @@ function FriendProgress({ friend }) {
                 <span class="text-xs text-gray-400 uppercase tracking-wider">Nudges</span>
             </div>
           </div>
-          <button class="w-full mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 shadow-sm flex justify-center items-center group">
+          <button
+            onClick={() => onNudge(friend)}
+            class="w-full mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200 shadow-sm flex justify-center items-center group"
+          >
             <span class="mr-2 group-hover:scale-110 transition-transform">👋</span> Send a Nudge
           </button>
         </div>
@@ -59,6 +62,7 @@ export function AccountabilityPage({ user }) {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [nudgePopup, setNudgePopup] = useState(null); // { friendName, message }
 
   useEffect(() => {
     if (!user) return;
@@ -80,8 +84,43 @@ export function AccountabilityPage({ user }) {
       .finally(() => setLoading(false));
   }, [user]);
 
+  const handleNudge = async (friend) => {
+    try {
+        await api.sendNudge(friend.id);
+        setNudgePopup({
+            friendName: friend.name,
+            message: `You nudged ${friend.name}! They'll get a notification.`
+        });
+
+        // Auto hide after 3 seconds
+        setTimeout(() => setNudgePopup(null), 3000);
+    } catch (e) {
+        console.error(e);
+        // Fallback or error state
+    }
+  };
+
   return (
-    <div class="container mx-auto p-6 max-w-5xl">
+    <div class="container mx-auto p-6 max-w-5xl relative">
+      {/* Nudge Popup */}
+      {nudgePopup && (
+        <div class="fixed top-24 right-6 z-50 animate-bounce-in">
+            <div class="bg-gray-800 border-l-4 border-amber-500 text-white p-4 rounded shadow-2xl flex items-center space-x-3 pr-8">
+                <div class="text-2xl">👋</div>
+                <div>
+                    <h4 class="font-bold">Nudge Sent!</h4>
+                    <p class="text-sm text-gray-300">You nudged {nudgePopup.friendName}</p>
+                </div>
+                <button
+                    onClick={() => setNudgePopup(null)}
+                    class="absolute top-2 right-2 text-gray-400 hover:text-white"
+                >
+                    &times;
+                </button>
+            </div>
+        </div>
+      )}
+
       <header class="mb-8">
         <h2 class="text-3xl font-bold text-white">Peer Progress</h2>
         <p class="text-gray-400 mt-1">Keep each other accountable and celebrate wins.</p>
@@ -111,7 +150,7 @@ export function AccountabilityPage({ user }) {
             ) : (
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {friends.map((friend) => (
-                    <FriendProgress key={friend.id} friend={friend} />
+                    <FriendProgress key={friend.id} friend={friend} onNudge={handleNudge} />
                 ))}
                 </div>
             )}
