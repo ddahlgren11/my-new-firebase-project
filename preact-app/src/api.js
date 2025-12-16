@@ -15,6 +15,7 @@ const getTasksCallable = httpsCallable(functions, 'getTasks');
 const updateTaskCallable = httpsCallable(functions, 'updateTask');
 const sendNudgeCallable = httpsCallable(functions, 'sendNudge');
 const syncUserCallable = httpsCallable(functions, 'syncUser');
+const getUserProfileCallable = httpsCallable(functions, 'getUserProfile');
 
 export const api = {
   syncUser: async () => {
@@ -22,6 +23,16 @@ export const api = {
       await syncUserCallable();
     } catch (e) {
       console.warn("Failed to sync user profile", e);
+    }
+  },
+
+  getUserProfile: async () => {
+    try {
+      const result = await getUserProfileCallable();
+      return result.data;
+    } catch (e) {
+      console.warn("Failed to fetch user profile", e);
+      return null;
     }
   },
 

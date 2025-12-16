@@ -4,6 +4,7 @@ export function Nav({ activePage, setActivePage }) {
     { id: "rooms", label: "Rooms" },
     { id: "friends", label: "Friends" },
     { id: "accountability", label: "Accountability" },
+    { id: "profile", label: "Profile" },
   ];
 
   return (
