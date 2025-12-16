@@ -47,8 +47,13 @@ export function RoomDetails({ room, user, onJoinSession }) {
         {activeSession && (
           <button
             onClick={async () => {
+              try {
                 await api.joinSession(activeSession.id);
                 onJoinSession(activeSession);
+              } catch (e) {
+                console.error("Failed to join session:", e);
+                alert("Failed to join session: " + e.message);
+              }
             }}
             class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded animate-pulse"
           >
