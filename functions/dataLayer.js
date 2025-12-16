@@ -84,6 +84,13 @@ const Schemas = {
     userId2: { default: null },
     status: { default: "accepted" },
     createdAt: { default: () => Date.now() }
+  },
+  SessionParticipant: {
+    id: { default: () => generateId() },
+    sessionId: { default: null },
+    userId: { default: null },
+    joinedAt: { default: () => Date.now() },
+    lastActiveAt: { default: () => Date.now() }
   }
 };
 
@@ -165,6 +172,12 @@ class IFriendshipRepository {
   // Domain queries
   async getFriendshipsForUser(userId) {}
   async areFriends(userA, userB) {}
+}
+
+class ISessionParticipantRepository {
+  async addParticipant(participant) {}
+  async getParticipants(sessionId) {}
+  async removeParticipant(sessionId, userId) {}
 }
 
 // --- Firestore Implementations ---
@@ -390,6 +403,13 @@ class FirestoreTaskRepository extends ITaskRepository {
     return snapshot.docs.map(doc => doc.data());
   }
 
+  async getAllTasksForRoom(roomId) {
+    const snapshot = await this.collection
+      .where('roomId', '==', roomId)
+      .get();
+    return snapshot.docs.map(doc => doc.data());
+  }
+
   async getIncompleteTasks(userId) {
     const snapshot = await this.collection
       .where('userId', '==', userId)
@@ -495,6 +515,45 @@ class FirestoreFriendshipRepository extends IFriendshipRepository {
   }
 }
 
+class FirestoreSessionParticipantRepository extends ISessionParticipantRepository {
+  constructor(db) {
+    super();
+    this.collection = db.collection('session_participants');
+  }
+
+  async addParticipant(data) {
+    // Check if exists
+    const q = await this.collection
+      .where('sessionId', '==', data.sessionId)
+      .where('userId', '==', data.userId)
+      .limit(1).get();
+
+    if (!q.empty) {
+      return q.docs[0].data();
+    }
+
+    const entity = mapToEntity(Schemas.SessionParticipant, data);
+    await this.collection.doc(entity.id).set(entity);
+    return entity;
+  }
+
+  async getParticipants(sessionId) {
+    const snapshot = await this.collection.where('sessionId', '==', sessionId).get();
+    return snapshot.docs.map(doc => doc.data());
+  }
+
+  async removeParticipant(sessionId, userId) {
+    const q = await this.collection
+      .where('sessionId', '==', sessionId)
+      .where('userId', '==', userId)
+      .get();
+
+    const batch = this.collection.firestore.batch();
+    q.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+  }
+}
+
 // Initialize repositories with Firestore
 // Note: admin.initializeApp() must be called before this file is required,
 // or at least before these instances are used.
@@ -507,6 +566,7 @@ const sessionRepo = new FirestoreSessionRepository(db);
 const taskRepo = new FirestoreTaskRepository(db);
 const messageRepo = new FirestoreMessageRepository(db);
 const friendshipRepo = new FirestoreFriendshipRepository(db);
+const sessionParticipantRepo = new FirestoreSessionParticipantRepository(db);
 
 // Exports
 module.exports = {
@@ -521,6 +581,7 @@ module.exports = {
   ITaskRepository,
   IMessageRepository,
   IFriendshipRepository,
+  ISessionParticipantRepository,
   // Implementations
   FirestoreUserRepository,
   FirestoreRoomRepository,
@@ -529,6 +590,7 @@ module.exports = {
   FirestoreTaskRepository,
   FirestoreMessageRepository,
   FirestoreFriendshipRepository,
+  FirestoreSessionParticipantRepository,
   // Instances
   userRepo,
   roomRepo,
@@ -536,5 +598,6 @@ module.exports = {
   sessionRepo,
   taskRepo,
   messageRepo,
-  friendshipRepo
+  friendshipRepo,
+  sessionParticipantRepo
 };
