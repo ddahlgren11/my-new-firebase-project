@@ -7,6 +7,7 @@ import { Nav } from './components/Nav';
 import { FriendsPage } from './components/FriendsPage';
 import { AccountabilityPage } from './components/AccountabilityPage';
 import { Dashboard } from './components/Dashboard';
+import { api } from './api';
 
 export function App() {
   const [user, setUser] = useState(null);
@@ -25,6 +26,10 @@ export function App() {
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      if (user) {
+        // Sync user profile to Firestore so friends/rooms work correctly
+        api.syncUser();
+      }
       setLoading(false);
     });
 

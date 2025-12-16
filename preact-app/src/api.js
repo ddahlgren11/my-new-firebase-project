@@ -14,11 +14,17 @@ const createTaskCallable = httpsCallable(functions, 'createTask');
 const getTasksCallable = httpsCallable(functions, 'getTasks');
 const updateTaskCallable = httpsCallable(functions, 'updateTask');
 const sendNudgeCallable = httpsCallable(functions, 'sendNudge');
-
-// Mock storage for session-lived friends
-const mockFriends = [];
+const syncUserCallable = httpsCallable(functions, 'syncUser');
 
 export const api = {
+  syncUser: async () => {
+    try {
+      await syncUserCallable();
+    } catch (e) {
+      console.warn("Failed to sync user profile", e);
+    }
+  },
+
   createTask: async (title, roomId) => {
     try {
         const result = await createTaskCallable({ title, roomId });
@@ -82,42 +88,29 @@ export const api = {
   getFriends: async (userId) => {
     try {
         const result = await getFriendsCallable();
-        const realFriends = Array.isArray(result.data) ? result.data : [];
-        return [...realFriends, ...mockFriends];
+        return Array.isArray(result.data) ? result.data : [];
     } catch (e) {
-        return mockFriends;
+        console.error("Error fetching friends", e);
+        return [];
     }
   },
 
   addFriend: async ({ friendCode, username, targetUserId }) => {
-    // MOCK: Allow adding example friend Dillon
-    if (targetUserId === '12345' || username === 'Dillon') {
-        const friend = { id: '12345', name: 'Dillon', status: 'offline' };
-        if (!mockFriends.some(f => f.id === '12345')) {
-             mockFriends.push(friend);
-        }
-        return { message: "Friend added", friend };
-    }
     const result = await addFriendCallable({ friendCode, username, targetUserId });
     return result.data;
   },
 
   getSuggestedFriends: async () => {
-    let suggestions = [];
     try {
         const result = await getSuggestedFriendsCallable();
         if (Array.isArray(result.data)) {
-            suggestions = result.data;
+            return result.data;
         }
+        return [];
     } catch (e) {
-        console.warn("Backend call failed, using mock data only", e);
+        console.warn("Backend call failed", e);
+        return [];
     }
-
-    // Check if Dillon is already in the list to avoid duplicates
-    if (!suggestions.some(u => u.id === '12345')) {
-        suggestions.push({ id: '12345', name: 'Dillon', avatarUrl: '' });
-    }
-    return suggestions;
   },
   
   getFriendActivity: async (friendId) => {

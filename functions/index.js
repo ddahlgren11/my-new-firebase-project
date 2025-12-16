@@ -41,11 +41,53 @@ exports.getRooms = onCall(async (request) => {
   const userId = getUserId(request);
   logger.info("getRooms called", { userId });
 
-  // Use the new getAllRooms method (or getRoomsForUser if implemented fully)
-  // Since createRoom and getRooms are async now, we must await them.
-  const rooms = await roomRepo.getAllRooms();
+  const rooms = await roomRepo.getRoomsForUser(userId);
 
   return rooms;
+});
+
+// =====================================================================
+// syncUser
+// =====================================================================
+exports.syncUser = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("syncUser called", { userId });
+
+  if (userId === "default_user") {
+    // Cannot sync default user
+    return { success: false };
+  }
+
+  // Check if user exists
+  const existingUser = await userRepo.getUserById(userId);
+
+  // Get auth data if available
+  const authData = request.auth ? request.auth.token : {};
+  const displayName = authData.name || (authData.email ? authData.email.split('@')[0] : "Guest");
+  const avatarUrl = authData.picture || "";
+
+  if (!existingUser) {
+    // Create new user
+    await userRepo.createUser({
+      id: userId,
+      displayName,
+      email: authData.email || "",
+      avatarUrl
+    });
+    logger.info("Created new user profile", { userId });
+  } else {
+    // Update existing user if needed (optional, but good for keeping profile fresh)
+    // Only update if changed to save writes
+    const updates = {};
+    if (displayName && existingUser.displayName !== displayName) updates.displayName = displayName;
+    if (avatarUrl && existingUser.avatarUrl !== avatarUrl) updates.avatarUrl = avatarUrl;
+
+    if (Object.keys(updates).length > 0) {
+      await userRepo.updateUser(userId, updates);
+    }
+  }
+
+  return { success: true };
 });
 
 // =====================================================================
@@ -129,6 +171,13 @@ exports.startSession = onCall(async (request) => {
   const room = await roomRepo.getRoomById(roomId);
   if (!room) {
     throw new HttpsError("not-found", "Room not found.");
+  }
+
+  // Verify membership
+  const members = await membershipRepo.getMembers(roomId);
+  const isMember = members.some(m => m.userId === userId);
+  if (!isMember) {
+    throw new HttpsError("permission-denied", "You must be a member of the room to start a session.");
   }
 
   const newSession = await sessionRepo.createSession({
@@ -308,6 +357,15 @@ exports.createTask = onCall(async (request) => {
 
   if (!title) {
     throw new HttpsError("invalid-argument", "The function must be called with a 'title' argument.");
+  }
+
+  if (roomId) {
+    // Verify membership if roomId is provided
+    const members = await membershipRepo.getMembers(roomId);
+    const isMember = members.some(m => m.userId === userId);
+    if (!isMember) {
+      throw new HttpsError("permission-denied", "You must be a member of the room to create a task in it.");
+    }
   }
 
   const newTask = await taskRepo.createTask({
