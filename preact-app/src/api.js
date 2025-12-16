@@ -19,61 +19,32 @@ const getUserProfileCallable = httpsCallable(functions, 'getUserProfile');
 
 export const api = {
   syncUser: async () => {
-    try {
-      await syncUserCallable();
-    } catch (e) {
-      console.warn("Failed to sync user profile", e);
-    }
+    await syncUserCallable();
   },
 
   getUserProfile: async () => {
-    try {
-      const result = await getUserProfileCallable();
-      return result.data;
-    } catch (e) {
-      console.warn("Failed to fetch user profile", e);
-      return null;
-    }
+    const result = await getUserProfileCallable();
+    return result.data;
   },
 
   createTask: async (title, roomId) => {
-    try {
-        const result = await createTaskCallable({ title, roomId });
-        return result.data;
-    } catch (e) {
-        console.warn("Backend unavailable, using mock task");
-        return { id: 'mock-task-' + Date.now(), title, completed: false, roomId };
-    }
+    const result = await createTaskCallable({ title, roomId });
+    return result.data;
   },
 
   getTasks: async (roomId) => {
-    try {
-        const result = await getTasksCallable({ roomId });
-        return result.data;
-    } catch (e) {
-        console.warn("Backend unavailable, returning empty list");
-        return [];
-    }
+    const result = await getTasksCallable({ roomId });
+    return result.data;
   },
 
   updateTask: async (taskId, completed) => {
-    try {
-        const result = await updateTaskCallable({ taskId, completed });
-        return result.data;
-    } catch (e) {
-        console.warn("Backend unavailable, mocking success");
-        return { id: taskId, completed };
-    }
+    const result = await updateTaskCallable({ taskId, completed });
+    return result.data;
   },
 
   sendNudge: async (friendId) => {
-    try {
-        const result = await sendNudgeCallable({ friendId });
-        return result.data;
-    } catch (e) {
-         console.warn("Backend unavailable, mocking nudge");
-         return { success: true };
-    }
+    const result = await sendNudgeCallable({ friendId });
+    return result.data;
   },
 
   getRooms: async () => {
@@ -97,13 +68,8 @@ export const api = {
   },
   
   getFriends: async (userId) => {
-    try {
-        const result = await getFriendsCallable();
-        return Array.isArray(result.data) ? result.data : [];
-    } catch (e) {
-        console.error("Error fetching friends", e);
-        return [];
-    }
+    const result = await getFriendsCallable();
+    return Array.isArray(result.data) ? result.data : [];
   },
 
   addFriend: async ({ friendCode, username, targetUserId }) => {
@@ -112,16 +78,11 @@ export const api = {
   },
 
   getSuggestedFriends: async () => {
-    try {
-        const result = await getSuggestedFriendsCallable();
-        if (Array.isArray(result.data)) {
-            return result.data;
-        }
-        return [];
-    } catch (e) {
-        console.warn("Backend call failed", e);
-        return [];
+    const result = await getSuggestedFriendsCallable();
+    if (Array.isArray(result.data)) {
+        return result.data;
     }
+    return [];
   },
   
   getFriendActivity: async (friendId) => {
