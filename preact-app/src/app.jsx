@@ -6,6 +6,7 @@ import { RoomsPage } from './components/RoomsPage';
 import { Nav } from './components/Nav';
 import { FriendsPage } from './components/FriendsPage';
 import { AccountabilityPage } from './components/AccountabilityPage';
+import { ProfilePage } from './components/ProfilePage';
 import { Dashboard } from './components/Dashboard';
 import { api } from './api';
 
@@ -51,6 +52,7 @@ export function App() {
             {activePage === 'rooms' && <RoomsPage user={user} />}
             {activePage === 'friends' && <FriendsPage user={user} />}
             {activePage === 'accountability' && <AccountabilityPage user={user} />}
+            {activePage === 'profile' && <ProfilePage user={user} />}
           </div>
         </div>
       ) : (

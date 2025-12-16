@@ -91,6 +91,21 @@ exports.syncUser = onCall(async (request) => {
 });
 
 // =====================================================================
+// getUserProfile
+// =====================================================================
+exports.getUserProfile = onCall(async (request) => {
+  const userId = getUserId(request);
+  logger.info("getUserProfile called", { userId });
+
+  const user = await userRepo.getUserById(userId);
+  if (!user) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  return user;
+});
+
+// =====================================================================
 // createRoom
 // =====================================================================
 exports.createRoom = onCall(async (request) => {
