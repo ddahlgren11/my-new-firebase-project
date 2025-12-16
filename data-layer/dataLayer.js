@@ -6,6 +6,11 @@ function generateId() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 }
 
+// Invite Code Generator
+function generateCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
 // Mini-ORM Mapper
 function mapToEntity(schema, data) {
   const obj = {};
@@ -34,6 +39,7 @@ const Schemas = {
     id: { default: () => generateId() },
     name: { default: "New Room" },
     description: { default: "" },
+    inviteCode: { default: () => generateCode() },
     ownerId: { default: null },
     createdAt: { default: () => Date.now() }
   },
@@ -97,6 +103,7 @@ class IRoomRepository {
   async getRoomsByOwner(ownerId) {}
   async getRoomsForUser(userId) {}
   async getAllRooms() {}
+  async getRoomByInviteCode(inviteCode) {}
 }
 
 class IRoomMembershipRepository {
@@ -242,6 +249,12 @@ class FirestoreRoomRepository extends IRoomRepository {
   async getAllRooms() {
     const snapshot = await this.collection.get();
     return snapshot.docs.map(doc => doc.data());
+  }
+
+  async getRoomByInviteCode(inviteCode) {
+    const snapshot = await this.collection.where('inviteCode', '==', inviteCode).limit(1).get();
+    if (snapshot.empty) return null;
+    return snapshot.docs[0].data();
   }
 }
 
