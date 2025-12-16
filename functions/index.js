@@ -209,6 +209,30 @@ exports.startSession = onCall(async (request) => {
 });
 
 // =====================================================================
+// getSessions
+// =====================================================================
+exports.getSessions = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { roomId } = request.data;
+
+  logger.info("getSessions called", { userId, roomId });
+
+  if (!roomId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'roomId' argument.");
+  }
+
+  // Verify membership
+  const members = await membershipRepo.getMembers(roomId);
+  const isMember = members.some(m => m.userId === userId);
+  if (!isMember) {
+    throw new HttpsError("permission-denied", "You must be a member of the room to view sessions.");
+  }
+
+  const sessions = await sessionRepo.getSessionsForRoom(roomId);
+  return sessions;
+});
+
+// =====================================================================
 // addFriend
 // =====================================================================
 exports.addFriend = onCall(async (request) => {

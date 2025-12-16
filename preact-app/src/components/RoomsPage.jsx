@@ -115,7 +115,7 @@ export function RoomsPage({ user }) {
                     <p class="text-gray-400 text-sm mt-1">Room Details & Activity</p>
                 </div>
                 <div class="p-6">
-                    <RoomDetails room={selectedRoom} user={user} />
+                    <RoomDetails room={selectedRoom} user={user} onJoinSession={handleSessionStarted} />
                 </div>
             </div>
           ) : (
