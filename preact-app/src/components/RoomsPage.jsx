@@ -44,6 +44,18 @@ export function RoomsPage({ user }) {
   const handleSessionStarted = (newSession) => {
     console.log("Session started:", newSession);
     const room = rooms.find(r => r.id === newSession.roomId);
+    if (!room) {
+      console.error("Could not find room for session:", newSession.roomId);
+      // Try to fallback to selectedRoom if IDs match, or alert.
+      // Since we are likely in the selected room context:
+      if (selectedRoomId === newSession.roomId) {
+         // This implies rooms list might be stale or empty but we have an ID?
+         // But rooms.find uses rooms state.
+         // If we are here, something is wrong with state consistency.
+         alert("Error: Room data not found. Please refresh.");
+      }
+      return;
+    }
     setSessionRoom(room);
     setActiveSession(newSession);
   };

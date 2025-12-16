@@ -233,6 +233,13 @@ exports.joinSession = onCall(async (request) => {
     throw new HttpsError("not-found", "Session not found.");
   }
 
+  // Verify session is active
+  const now = Date.now();
+  const endTime = session.endTime || (session.startTime + session.durationMinutes * 60 * 1000);
+  if (session.endTime || now > endTime) {
+      throw new HttpsError("failed-precondition", "Session has ended.");
+  }
+
   // Verify membership of room
   const members = await membershipRepo.getMembers(session.roomId);
   const isMember = members.some(m => m.userId === userId);
