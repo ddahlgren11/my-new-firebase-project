@@ -47,6 +47,7 @@ export const api = {
     return [
         { id: 'f1', name: 'Alex Focus', status: 'in-session' },
         { id: 'f2', name: 'Ben Chill', status: 'offline' },
+        { id: 'f3', name: 'Sarah Study', status: 'in-session' },
     ];
   },
   
