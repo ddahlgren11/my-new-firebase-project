@@ -33,6 +33,7 @@ const Schemas = {
     displayName: { default: "" },
     email: { default: "" },
     avatarUrl: { default: "" },
+    friendCode: { default: () => generateCode() },
     createdAt: { default: () => Date.now() }
   },
   Room: {
@@ -75,6 +76,13 @@ const Schemas = {
     roomId: { default: null },
     userId: { default: null },
     text: { default: "" },
+    createdAt: { default: () => Date.now() }
+  },
+  Friendship: {
+    id: { default: () => generateId() },
+    userId1: { default: null },
+    userId2: { default: null },
+    status: { default: "accepted" },
     createdAt: { default: () => Date.now() }
   }
 };
@@ -147,6 +155,16 @@ class IMessageRepository {
 
   // Domain queries
   async getMessagesForRoom(roomId) {}
+}
+
+class IFriendshipRepository {
+  async createFriendship(friendship) {}
+  async getFriendshipById(id) {}
+  async deleteFriendship(id) {}
+
+  // Domain queries
+  async getFriendshipsForUser(userId) {}
+  async areFriends(userA, userB) {}
 }
 
 // --- Firestore Implementations ---
@@ -418,6 +436,57 @@ class FirestoreMessageRepository extends IMessageRepository {
   }
 }
 
+class FirestoreFriendshipRepository extends IFriendshipRepository {
+  constructor(db) {
+    super();
+    this.collection = db.collection('friendships');
+  }
+
+  async createFriendship(data) {
+    const entity = mapToEntity(Schemas.Friendship, data);
+    await this.collection.doc(entity.id).set(entity);
+    return entity;
+  }
+
+  async getFriendshipById(id) {
+    const doc = await this.collection.doc(id).get();
+    return doc.exists ? doc.data() : null;
+  }
+
+  async deleteFriendship(id) {
+    await this.collection.doc(id).delete();
+  }
+
+  async getFriendshipsForUser(userId) {
+    // Query both sides
+    const q1 = this.collection.where('userId1', '==', userId).get();
+    const q2 = this.collection.where('userId2', '==', userId).get();
+
+    const [snap1, snap2] = await Promise.all([q1, q2]);
+    const friends1 = snap1.docs.map(doc => doc.data());
+    const friends2 = snap2.docs.map(doc => doc.data());
+
+    // De-dupe if necessary (though shouldn't happen if logic is correct)
+    return [...friends1, ...friends2];
+  }
+
+  async areFriends(userA, userB) {
+    // Check both directions
+    const q1 = this.collection
+      .where('userId1', '==', userA)
+      .where('userId2', '==', userB)
+      .limit(1).get();
+
+    const q2 = this.collection
+      .where('userId1', '==', userB)
+      .where('userId2', '==', userA)
+      .limit(1).get();
+
+    const [snap1, snap2] = await Promise.all([q1, q2]);
+    return !snap1.empty || !snap2.empty;
+  }
+}
+
 // Initialize repositories with Firestore
 // Note: admin.initializeApp() must be called before this file is required,
 // or at least before these instances are used.
@@ -429,6 +498,7 @@ const membershipRepo = new FirestoreRoomMembershipRepository(db);
 const sessionRepo = new FirestoreSessionRepository(db);
 const taskRepo = new FirestoreTaskRepository(db);
 const messageRepo = new FirestoreMessageRepository(db);
+const friendshipRepo = new FirestoreFriendshipRepository(db);
 
 // Exports
 module.exports = {
@@ -442,6 +512,7 @@ module.exports = {
   ISessionRepository,
   ITaskRepository,
   IMessageRepository,
+  IFriendshipRepository,
   // Implementations
   FirestoreUserRepository,
   FirestoreRoomRepository,
@@ -449,11 +520,13 @@ module.exports = {
   FirestoreSessionRepository,
   FirestoreTaskRepository,
   FirestoreMessageRepository,
+  FirestoreFriendshipRepository,
   // Instances
   userRepo,
   roomRepo,
   membershipRepo,
   sessionRepo,
   taskRepo,
-  messageRepo
+  messageRepo,
+  friendshipRepo
 };

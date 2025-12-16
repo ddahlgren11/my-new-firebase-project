@@ -11,6 +11,9 @@ const getRoomsCallable = httpsCallable(functions, 'getRooms');
 const createRoomCallable = httpsCallable(functions, 'createRoom');
 const joinRoomCallable = httpsCallable(functions, 'joinRoom');
 const startSessionCallable = httpsCallable(functions, 'startSession');
+const getFriendsCallable = httpsCallable(functions, 'getFriends');
+const addFriendCallable = httpsCallable(functions, 'addFriend');
+const getSuggestedFriendsCallable = httpsCallable(functions, 'getSuggestedFriends');
 
 // --- Export reusable API calls ---
 export const api = {
@@ -39,15 +42,20 @@ export const api = {
     return result.data;
   },
   
-  // Placeholder for getFriends and getFriendActivity (assuming they will also be callable functions)
   getFriends: async (userId) => {
-    // You'd typically call a function like 'getFriendsList' here
-    // return (await httpsCallable(functions, 'getFriendsList')({ userId })).data;
-    console.warn("MOCK: getFriends using placeholder data.");
-    return [
-        { id: 'f1', name: 'Alex Focus', status: 'in-session' },
-        { id: 'f2', name: 'Ben Chill', status: 'offline' },
-    ];
+    // Note: The backend function gets userId from context mostly, but we keep signature consistent
+    const result = await getFriendsCallable();
+    return result.data;
+  },
+
+  addFriend: async ({ friendCode, username, targetUserId }) => {
+    const result = await addFriendCallable({ friendCode, username, targetUserId });
+    return result.data;
+  },
+
+  getSuggestedFriends: async () => {
+    const result = await getSuggestedFriendsCallable();
+    return result.data;
   },
   
   getFriendActivity: async (friendId) => {
