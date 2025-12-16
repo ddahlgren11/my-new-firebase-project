@@ -84,8 +84,8 @@ exports.joinRoom = onCall(async (request) => {
 
   logger.info("joinRoom called", { userId, inviteCode });
 
-  // Mock implementation: If inviteCode matches a room ID, join it.
-  const room = await roomRepo.getRoomById(inviteCode);
+  // Use the new getRoomByInviteCode method
+  const room = await roomRepo.getRoomByInviteCode(inviteCode);
 
   if (!room) {
       throw new HttpsError("not-found", "Room not found or invalid invite code.");

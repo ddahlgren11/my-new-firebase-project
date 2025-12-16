@@ -4,10 +4,13 @@ import { CreateRoom } from "./CreateRoom";
 import { JoinRoom } from "./JoinRoom";
 import { StartSession } from "./StartSession";
 import { RoomDetails } from "./RoomDetails";
+import { SessionView } from "./SessionView";
 
 export function RoomsPage({ user }) {
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
+  const [sessionRoom, setSessionRoom] = useState(null);
 
   const fetchRooms = () => {
     api
@@ -40,10 +43,27 @@ export function RoomsPage({ user }) {
 
   const handleSessionStarted = (newSession) => {
     console.log("Session started:", newSession);
-    alert(`Session started with mode: ${newSession.mode}`);
+    const room = rooms.find(r => r.id === newSession.roomId);
+    setSessionRoom(room);
+    setActiveSession(newSession);
+  };
+
+  const handleEndSession = () => {
+    setActiveSession(null);
+    setSessionRoom(null);
   };
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+
+  if (activeSession && sessionRoom) {
+    return (
+      <SessionView
+        session={activeSession}
+        room={sessionRoom}
+        onEndSession={handleEndSession}
+      />
+    );
+  }
 
   return (
     <div class="container mx-auto p-6">
@@ -71,7 +91,7 @@ export function RoomsPage({ user }) {
               >
                 <div class="flex-grow">
                     <span class="font-medium text-lg text-white block">{r.name}</span>
-                    <span class="text-xs text-gray-400">ID: {r.id}</span>
+                    <span class="text-xs text-gray-400 mr-2">Code: <span class="font-mono text-indigo-400">{r.inviteCode}</span></span>
                 </div>
                 <StartSession
                   roomId={r.id}
