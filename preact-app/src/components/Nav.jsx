@@ -15,8 +15,8 @@ export function Nav({ activePage, setActivePage }) {
             <span
                 class="font-bold text-xl tracking-tight cursor-pointer hover:text-indigo-400 transition-colors"
                 onClick={() => setActivePage('dashboard')}
-            >
-                FocusApp
+            > 
+                Procrastinot
             </span>
           </div>
           <div class="flex space-x-1">
