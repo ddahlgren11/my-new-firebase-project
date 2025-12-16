@@ -1,22 +1,42 @@
 import { useState, useEffect } from "preact/hooks";
 import { TaskManager } from "./TaskManager";
+import { api } from "../api";
 
 export function SessionView({ session, room, onEndSession }) {
-  const [timeLeft, setTimeLeft] = useState(session.durationMinutes * 60);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isActive, setIsActive] = useState(true);
+  const [participants, setParticipants] = useState([]);
 
   useEffect(() => {
-    let interval = null;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((seconds) => seconds - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      setIsActive(false);
-      // Optional: Play a sound or show notification
-    }
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+    // 1. Calculate synced time
+    const updateTime = () => {
+        const endTime = session.startTime + (session.durationMinutes * 60 * 1000);
+        const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining === 0) setIsActive(false);
+    };
+
+    updateTime(); // Initial
+    const timerInterval = setInterval(updateTime, 1000);
+
+    // 2. Fetch Participants
+    const fetchDetails = async () => {
+        try {
+            const details = await api.getSessionDetails(session.id);
+            setParticipants(details.participants || []);
+        } catch (e) {
+            console.error("Failed to fetch session details", e);
+        }
+    };
+
+    fetchDetails();
+    const pollInterval = setInterval(fetchDetails, 5000);
+
+    return () => {
+        clearInterval(timerInterval);
+        clearInterval(pollInterval);
+    };
+  }, [session]);
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -40,40 +60,41 @@ export function SessionView({ session, room, onEndSession }) {
           <div class="text-9xl font-mono font-bold tracking-wider mb-4 text-white drop-shadow-lg">
             {formatTime(timeLeft)}
           </div>
-          <div class="text-2xl text-purple-300 uppercase tracking-widest font-semibold">
+          <div class="text-2xl text-purple-300 uppercase tracking-widest font-semibold mb-6">
             {session.mode.replace('_', ' ')}
+          </div>
+
+          {/* Participants */}
+          <div class="flex space-x-4 mb-4">
+            {participants.map(p => (
+                <div key={p.userId} class="flex flex-col items-center">
+                    {p.avatarUrl ? (
+                        <img src={p.avatarUrl} alt={p.displayName} class="w-10 h-10 rounded-full border-2 border-purple-500" />
+                    ) : (
+                        <div class="w-10 h-10 rounded-full bg-gray-600 border-2 border-purple-500 flex items-center justify-center text-xs font-bold">
+                            {p.displayName[0]}
+                        </div>
+                    )}
+                    <span class="text-xs text-gray-400 mt-1">{p.displayName}</span>
+                </div>
+            ))}
           </div>
         </div>
 
         <div class="flex justify-center space-x-6">
-            {!isActive && timeLeft > 0 ? (
-                 <button
-                 onClick={() => setIsActive(true)}
-                 class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
-               >
-                 Resume
-               </button>
-            ) : (
-                isActive && (
-                    <button
-                    onClick={() => setIsActive(false)}
-                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
-                  >
-                    Pause
-                  </button>
-                )
-            )}
+            {/* Removed Pause/Resume for now as they are complex to sync without Firestore listeners.
+                Assuming session runs straight through based on server time. */}
 
           <button
             onClick={onEndSession}
             class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
           >
-            End Session
+            Leave Session
           </button>
         </div>
 
-        <div class="flex justify-center mt-8">
-            <TaskManager roomId={room.id} />
+        <div class="flex justify-center mt-8 w-full">
+            <TaskManager roomId={room.id} includeAllUsers={true} />
         </div>
       </div>
     </div>

@@ -2,17 +2,62 @@ import { useState, useEffect } from "preact/hooks";
 import { api } from "../api";
 import { TaskTracker } from "./TaskTracker";
 
-export function RoomDetails({ room, user }) {
+export function RoomDetails({ room, user, onJoinSession }) {
+  const [activeSession, setActiveSession] = useState(null);
+
+  useEffect(() => {
+    let intervalId;
+
+    const fetchSessions = () => {
+      api.getSessions(room.id)
+        .then(sessions => {
+          // Find active session
+          const now = Date.now();
+          const active = sessions.find(s => {
+            const endTime = s.startTime + (s.durationMinutes * 60 * 1000);
+            return !s.endTime && now < endTime;
+          });
+          setActiveSession(active || null);
+        })
+        .catch(console.error);
+    };
+
+    if (room) {
+      fetchSessions();
+      // Poll every 10 seconds
+      intervalId = setInterval(fetchSessions, 10000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [room]);
+
   if (!room) return <div>Select a room to see details.</div>;
 
-  // Placeholder for sessionId, as we don't have an API to fetch active sessions yet.
-  const sessionId = "s_placeholder_123";
+  const sessionId = activeSession ? activeSession.id : "s_placeholder_123";
 
   return (
     <div class="p-4 border rounded-lg shadow-sm">
-      <h3 class="text-xl font-bold mb-2">{room.name}</h3>
+      <div class="flex justify-between items-start mb-4">
+        <div>
+           <h3 class="text-xl font-bold mb-2">{room.name}</h3>
+           <p class="text-gray-300"><strong>Mode:</strong> {room.mode || "Standard"}</p>
+        </div>
+        {activeSession && (
+          <button
+            onClick={async () => {
+                await api.joinSession(activeSession.id);
+                onJoinSession(activeSession);
+            }}
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded animate-pulse"
+          >
+            Join Active Session
+          </button>
+        )}
+      </div>
+
       <div class="mb-4 text-gray-300">
-        <p class="mb-2"><strong>Mode:</strong> {room.mode || "Standard"}</p>
         <div class="p-3 bg-indigo-900 bg-opacity-30 border border-indigo-700 rounded-lg">
            <p class="text-sm text-indigo-300 mb-1 font-bold uppercase tracking-wider">Room Join Code</p>
            <div class="flex items-center space-x-2">
