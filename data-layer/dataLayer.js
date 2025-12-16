@@ -382,6 +382,14 @@ class FirestoreTaskRepository extends ITaskRepository {
     return snapshot.docs.map(doc => doc.data());
   }
 
+  async getTasksForRoom(userId, roomId) {
+    const snapshot = await this.collection
+      .where('userId', '==', userId)
+      .where('roomId', '==', roomId)
+      .get();
+    return snapshot.docs.map(doc => doc.data());
+  }
+
   async getIncompleteTasks(userId) {
     const snapshot = await this.collection
       .where('userId', '==', userId)
