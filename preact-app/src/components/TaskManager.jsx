@@ -1,7 +1,7 @@
 import { useState, useEffect } from "preact/hooks";
 import { api } from "../api";
 
-export function TaskManager({ roomId }) {
+export function TaskManager({ roomId, includeAllUsers = false }) {
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [loading, setLoading] = useState(true);
@@ -10,12 +10,15 @@ export function TaskManager({ roomId }) {
 
   useEffect(() => {
     loadTasks();
-  }, [roomId]);
+    const interval = setInterval(loadTasks, 5000); // Poll for updates
+    return () => clearInterval(interval);
+  }, [roomId, includeAllUsers]);
 
   async function loadTasks() {
-    setLoading(true);
+    // Only show loading on initial fetch
+    if (tasks.length === 0) setLoading(true);
     try {
-      const data = await api.getTasks(roomId);
+      const data = await api.getTasks(roomId, includeAllUsers);
       setTasks(data);
       setError(null);
     } catch (err) {
@@ -96,14 +99,25 @@ export function TaskManager({ roomId }) {
       ) : (
         <ul class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
           {tasks.map((task) => (
-            <li key={task.id} class="flex items-center group bg-gray-900/50 p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors">
+            <li key={task.id} class="flex flex-col group bg-gray-900/50 p-3 rounded-lg border border-transparent hover:border-gray-600 transition-colors">
+               {includeAllUsers && task.user && (
+                  <div class="flex items-center mb-2 text-xs text-gray-400">
+                    {task.user.avatarUrl ? (
+                        <img src={task.user.avatarUrl} class="w-4 h-4 rounded-full mr-2" />
+                    ) : (
+                        <div class="w-4 h-4 rounded-full bg-gray-600 mr-2"></div>
+                    )}
+                    <span>{task.user.displayName}</span>
+                  </div>
+               )}
               <label class="flex items-center cursor-pointer w-full">
                 <div class="relative flex items-center">
                     <input
                     type="checkbox"
                     checked={task.completed}
                     onChange={(e) => handleToggleTask(task.id, e.target.checked)}
-                    class="peer h-5 w-5 cursor-pointer appearance-none rounded border border-gray-500 bg-gray-900 transition-all checked:border-green-500 checked:bg-green-500 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:ring-offset-0"
+                    disabled={includeAllUsers && !task.userId /* TODO: check if it's mine, for now backend blocks it anyway */}
+                    class="peer h-5 w-5 cursor-pointer appearance-none rounded border border-gray-500 bg-gray-900 transition-all checked:border-green-500 checked:bg-green-500 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <svg
                     class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 transition-opacity peer-checked:opacity-100"

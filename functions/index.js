@@ -20,7 +20,8 @@ const {
   userRepo,
   membershipRepo,
   friendshipRepo,
-  taskRepo
+  taskRepo,
+  sessionParticipantRepo
 } = require("./dataLayer.js");
 
 
@@ -205,7 +206,84 @@ exports.startSession = onCall(async (request) => {
     startTime: Date.now()
   });
 
+  // Add creator as participant
+  await sessionParticipantRepo.addParticipant({
+    sessionId: newSession.id,
+    userId: userId
+  });
+
   return newSession;
+});
+
+// =====================================================================
+// joinSession
+// =====================================================================
+exports.joinSession = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { sessionId } = request.data;
+
+  logger.info("joinSession called", { userId, sessionId });
+
+  if (!sessionId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'sessionId' argument.");
+  }
+
+  const session = await sessionRepo.getSessionById(sessionId);
+  if (!session) {
+    throw new HttpsError("not-found", "Session not found.");
+  }
+
+  // Verify membership of room
+  const members = await membershipRepo.getMembers(session.roomId);
+  const isMember = members.some(m => m.userId === userId);
+  if (!isMember) {
+    throw new HttpsError("permission-denied", "You must be a member of the room to join its session.");
+  }
+
+  await sessionParticipantRepo.addParticipant({
+    sessionId,
+    userId
+  });
+
+  return { success: true };
+});
+
+// =====================================================================
+// getSessionDetails
+// =====================================================================
+exports.getSessionDetails = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { sessionId } = request.data;
+
+  if (!sessionId) {
+    throw new HttpsError("invalid-argument", "Must provide sessionId.");
+  }
+
+  const session = await sessionRepo.getSessionById(sessionId);
+  if (!session) throw new HttpsError("not-found", "Session not found.");
+
+  // Check room membership
+  const members = await membershipRepo.getMembers(session.roomId);
+  if (!members.some(m => m.userId === userId)) {
+    throw new HttpsError("permission-denied", "Not a room member.");
+  }
+
+  const participants = await sessionParticipantRepo.getParticipants(sessionId);
+
+  // Enrich participants with user info
+  const users = await Promise.all(participants.map(async p => {
+    const user = await userRepo.getUserById(p.userId);
+    return {
+      userId: p.userId,
+      displayName: user ? user.displayName : "Unknown",
+      avatarUrl: user ? user.avatarUrl : ""
+    };
+  }));
+
+  return {
+    session,
+    participants: users
+  };
 });
 
 // =====================================================================
@@ -422,14 +500,42 @@ exports.createTask = onCall(async (request) => {
 // =====================================================================
 exports.getTasks = onCall(async (request) => {
   const userId = getUserId(request);
-  const { roomId } = request.data || {};
+  const { roomId, includeAllUsers } = request.data || {};
 
-  logger.info("getTasks called", { userId, roomId });
+  logger.info("getTasks called", { userId, roomId, includeAllUsers });
 
   // Use room filtering at DB level if room provided
   let tasks;
   if (roomId) {
-    tasks = await taskRepo.getTasksForRoom(userId, roomId);
+    if (includeAllUsers) {
+      // Check membership first
+      const members = await membershipRepo.getMembers(roomId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        throw new HttpsError("permission-denied", "Not a member of this room.");
+      }
+      tasks = await taskRepo.getAllTasksForRoom(roomId);
+
+      // Enrich with user info for shared view
+      // Optimization: batch fetch unique user IDs
+      const uniqueUserIds = [...new Set(tasks.map(t => t.userId))];
+      const userMap = {};
+      await Promise.all(uniqueUserIds.map(async uid => {
+        const u = await userRepo.getUserById(uid);
+        if (u) userMap[uid] = u;
+      }));
+
+      tasks = tasks.map(t => ({
+        ...t,
+        user: userMap[t.userId] ? {
+            displayName: userMap[t.userId].displayName,
+            avatarUrl: userMap[t.userId].avatarUrl
+        } : null
+      }));
+
+    } else {
+      tasks = await taskRepo.getTasksForRoom(userId, roomId);
+    }
   } else {
     tasks = await taskRepo.getTasksForUser(userId);
   }

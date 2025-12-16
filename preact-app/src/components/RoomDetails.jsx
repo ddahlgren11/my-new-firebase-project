@@ -46,7 +46,10 @@ export function RoomDetails({ room, user, onJoinSession }) {
         </div>
         {activeSession && (
           <button
-            onClick={() => onJoinSession(activeSession)}
+            onClick={async () => {
+                await api.joinSession(activeSession.id);
+                onJoinSession(activeSession);
+            }}
             class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded animate-pulse"
           >
             Join Active Session

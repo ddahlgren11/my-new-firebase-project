@@ -7,6 +7,8 @@ const getRoomsCallable = httpsCallable(functions, 'getRooms');
 const createRoomCallable = httpsCallable(functions, 'createRoom');
 const joinRoomCallable = httpsCallable(functions, 'joinRoom');
 const startSessionCallable = httpsCallable(functions, 'startSession');
+const joinSessionCallable = httpsCallable(functions, 'joinSession');
+const getSessionDetailsCallable = httpsCallable(functions, 'getSessionDetails');
 const getSessionsCallable = httpsCallable(functions, 'getSessions');
 const getFriendsCallable = httpsCallable(functions, 'getFriends');
 const addFriendCallable = httpsCallable(functions, 'addFriend');
@@ -33,8 +35,8 @@ export const api = {
     return result.data;
   },
 
-  getTasks: async (roomId) => {
-    const result = await getTasksCallable({ roomId });
+  getTasks: async (roomId, includeAllUsers = false) => {
+    const result = await getTasksCallable({ roomId, includeAllUsers });
     return result.data;
   },
 
@@ -65,6 +67,16 @@ export const api = {
   
   startSession: async (roomId, mode) => {
     const result = await startSessionCallable({ roomId, mode });
+    return result.data;
+  },
+
+  joinSession: async (sessionId) => {
+    const result = await joinSessionCallable({ sessionId });
+    return result.data;
+  },
+
+  getSessionDetails: async (sessionId) => {
+    const result = await getSessionDetailsCallable({ sessionId });
     return result.data;
   },
 
