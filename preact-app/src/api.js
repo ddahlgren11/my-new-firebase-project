@@ -4,6 +4,7 @@ import { functions } from "./firebase"; // Import the functions instance
 import { httpsCallable } from "firebase/functions"; // Import the callable function utility
 
 const getRoomsCallable = httpsCallable(functions, 'getRooms');
+const getRoomMembersCallable = httpsCallable(functions, 'getRoomMembers');
 const createRoomCallable = httpsCallable(functions, 'createRoom');
 const joinRoomCallable = httpsCallable(functions, 'joinRoom');
 const startSessionCallable = httpsCallable(functions, 'startSession');
@@ -52,6 +53,11 @@ export const api = {
 
   getRooms: async () => {
     const result = await getRoomsCallable();
+    return result.data;
+  },
+
+  getRoomMembers: async (roomId) => {
+    const result = await getRoomMembersCallable({ roomId });
     return result.data;
   },
   

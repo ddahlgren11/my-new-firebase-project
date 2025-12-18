@@ -48,6 +48,37 @@ exports.getRooms = onCall(async (request) => {
 });
 
 // =====================================================================
+// getRoomMembers
+// =====================================================================
+exports.getRoomMembers = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { roomId } = request.data;
+
+  logger.info("getRoomMembers called", { userId, roomId });
+
+  if (!roomId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'roomId' argument.");
+  }
+
+  // Verify membership
+  const members = await membershipRepo.getMembers(roomId);
+  const isMember = members.some(m => m.userId === userId);
+
+  if (!isMember) {
+    throw new HttpsError("permission-denied", "You must be a member of the room to view its members.");
+  }
+
+  const users = await userRepo.getUsersInRoom(roomId);
+
+  // Return sanitized user objects
+  return users.map(u => ({
+    id: u.id,
+    displayName: u.displayName,
+    avatarUrl: u.avatarUrl
+  }));
+});
+
+// =====================================================================
 // syncUser
 // =====================================================================
 exports.syncUser = onCall(async (request) => {
