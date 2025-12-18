@@ -4,6 +4,7 @@ import { TaskTracker } from "./TaskTracker";
 
 export function RoomDetails({ room, user, onJoinSession }) {
   const [activeSession, setActiveSession] = useState(null);
+  const [members, setMembers] = useState([]);
 
   useEffect(() => {
     let intervalId;
@@ -22,8 +23,15 @@ export function RoomDetails({ room, user, onJoinSession }) {
         .catch(console.error);
     };
 
+    const fetchMembers = () => {
+      api.getRoomMembers(room.id)
+        .then(setMembers)
+        .catch(console.error);
+    };
+
     if (room) {
       fetchSessions();
+      fetchMembers();
       // Poll every 10 seconds
       intervalId = setInterval(fetchSessions, 10000);
     }
@@ -78,6 +86,24 @@ export function RoomDetails({ room, user, onJoinSession }) {
             {room.description || "No specific requirements set."}
           </p>
       </div>
+
+      <div class="mb-6">
+        <h4 class="font-bold text-gray-300 mb-2">Members ({members.length}):</h4>
+        <div class="flex flex-wrap gap-2">
+          {members.map(member => (
+            <div key={member.id} class="flex items-center space-x-2 bg-gray-800 p-2 rounded-lg border border-gray-700">
+              <img
+                src={member.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.displayName)}&background=random`}
+                alt={member.displayName}
+                class="w-6 h-6 rounded-full"
+              />
+              <span class="text-sm text-gray-300">{member.displayName}</span>
+            </div>
+          ))}
+          {members.length === 0 && <span class="text-gray-500 text-sm">Loading members...</span>}
+        </div>
+      </div>
+
       <TaskTracker roomId={room.id} sessionId={sessionId} userId={user.uid} />
     </div>
   );
