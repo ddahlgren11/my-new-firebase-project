@@ -60,6 +60,7 @@ export function RoomsPage({ user }) {
       <SessionView
         session={activeSession}
         room={sessionRoom}
+        user={user}
         onEndSession={handleEndSession}
       />
     );

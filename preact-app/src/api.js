@@ -9,6 +9,7 @@ const joinRoomCallable = httpsCallable(functions, 'joinRoom');
 const startSessionCallable = httpsCallable(functions, 'startSession');
 const joinSessionCallable = httpsCallable(functions, 'joinSession');
 const getSessionDetailsCallable = httpsCallable(functions, 'getSessionDetails');
+const endSessionCallable = httpsCallable(functions, 'endSession');
 const getSessionsCallable = httpsCallable(functions, 'getSessions');
 const getFriendsCallable = httpsCallable(functions, 'getFriends');
 const addFriendCallable = httpsCallable(functions, 'addFriend');
@@ -77,6 +78,11 @@ export const api = {
 
   getSessionDetails: async (sessionId) => {
     const result = await getSessionDetailsCallable({ sessionId });
+    return result.data;
+  },
+
+  endSession: async (sessionId) => {
+    const result = await endSessionCallable({ sessionId });
     return result.data;
   },
 

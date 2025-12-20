@@ -249,6 +249,37 @@ exports.joinSession = onCall(async (request) => {
 });
 
 // =====================================================================
+// endSession
+// =====================================================================
+exports.endSession = onCall(async (request) => {
+  const userId = getUserId(request);
+  const { sessionId } = request.data;
+
+  logger.info("endSession called", { userId, sessionId });
+
+  if (!sessionId) {
+    throw new HttpsError("invalid-argument", "The function must be called with a 'sessionId' argument.");
+  }
+
+  const session = await sessionRepo.getSessionById(sessionId);
+  if (!session) {
+    throw new HttpsError("not-found", "Session not found.");
+  }
+
+  // Verify creator
+  if (session.userId !== userId) {
+    throw new HttpsError("permission-denied", "Only the session creator can end the session.");
+  }
+
+  // End the session
+  await sessionRepo.updateSession(sessionId, {
+    endTime: Date.now()
+  });
+
+  return { success: true };
+});
+
+// =====================================================================
 // getSessionDetails
 // =====================================================================
 exports.getSessionDetails = onCall(async (request) => {
