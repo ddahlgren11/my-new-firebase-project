@@ -2,7 +2,7 @@ import { useState, useEffect } from "preact/hooks";
 import { TaskManager } from "./TaskManager";
 import { api } from "../api";
 
-export function SessionView({ session, room, onEndSession }) {
+export function SessionView({ session, room, user, onEndSession }) {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [participants, setParticipants] = useState([]);
@@ -19,11 +19,17 @@ export function SessionView({ session, room, onEndSession }) {
     updateTime(); // Initial
     const timerInterval = setInterval(updateTime, 1000);
 
-    // 2. Fetch Participants
+    // 2. Fetch Participants and Check Status
     const fetchDetails = async () => {
         try {
             const details = await api.getSessionDetails(session.id);
             setParticipants(details.participants || []);
+
+            // Check if session has been ended by host
+            if (details.session.endTime) {
+                alert("The session has been ended by the host.");
+                onEndSession();
+            }
         } catch (e) {
             console.error("Failed to fetch session details", e);
         }
@@ -37,6 +43,20 @@ export function SessionView({ session, room, onEndSession }) {
         clearInterval(pollInterval);
     };
   }, [session]);
+
+  const handleEndSessionClick = async () => {
+      if (window.confirm("Are you sure you want to end the session for everyone?")) {
+          try {
+              await api.endSession(session.id);
+              onEndSession();
+          } catch (e) {
+              console.error("Failed to end session:", e);
+              alert("Failed to end session: " + e.message);
+          }
+      }
+  };
+
+  const isCreator = user && session.userId === user.uid;
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -85,12 +105,21 @@ export function SessionView({ session, room, onEndSession }) {
             {/* Removed Pause/Resume for now as they are complex to sync without Firestore listeners.
                 Assuming session runs straight through based on server time. */}
 
-          <button
-            onClick={onEndSession}
-            class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
-          >
-            Leave Session
-          </button>
+          {isCreator ? (
+              <button
+                onClick={handleEndSessionClick}
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
+              >
+                End Session
+              </button>
+          ) : (
+              <button
+                onClick={onEndSession}
+                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 text-lg"
+              >
+                Leave Session
+              </button>
+          )}
         </div>
 
         <div class="flex justify-center mt-8 w-full">
