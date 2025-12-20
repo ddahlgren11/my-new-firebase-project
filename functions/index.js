@@ -44,7 +44,16 @@ exports.getRooms = onCall(async (request) => {
 
   const rooms = await roomRepo.getRoomsForUser(userId);
 
-  return rooms;
+  // Fetch member count for each room
+  const roomsWithCounts = await Promise.all(rooms.map(async (room) => {
+    const members = await membershipRepo.getMembers(room.id);
+    return {
+      ...room,
+      memberCount: members.length
+    };
+  }));
+
+  return roomsWithCounts;
 });
 
 // =====================================================================
