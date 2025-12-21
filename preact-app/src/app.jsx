@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'preact/hooks';
+import { LocationProvider, Router, Route } from 'preact-iso';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Login } from './components/Login';
 import { RoomsPage } from './components/RoomsPage';
+import { RoomDetails } from './components/RoomDetails';
 import { Nav } from './components/Nav';
 import { FriendsPage } from './components/FriendsPage';
 import { AccountabilityPage } from './components/AccountabilityPage';
@@ -13,7 +15,6 @@ import { api } from './api';
 export function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activePage, setActivePage] = useState('dashboard');
 
   useEffect(() => {
     // 🛑 CRITICAL FIX: Check if the 'auth' instance is available before subscribing.
@@ -43,21 +44,27 @@ export function App() {
   }
 
   return (
-    <main class="min-h-screen bg-gray-900 text-gray-100 font-sans">
-      {user ? (
-        <div class="flex flex-col min-h-screen">
-          <Nav activePage={activePage} setActivePage={setActivePage} />
-          <div class="flex-grow">
-            {activePage === 'dashboard' && <Dashboard setActivePage={setActivePage} />}
-            {activePage === 'rooms' && <RoomsPage user={user} />}
-            {activePage === 'friends' && <FriendsPage user={user} />}
-            {activePage === 'accountability' && <AccountabilityPage user={user} />}
-            {activePage === 'profile' && <ProfilePage user={user} />}
+    <LocationProvider>
+      <main class="min-h-screen bg-gray-900 text-gray-100 font-sans">
+        {user ? (
+          <div class="flex flex-col min-h-screen">
+            <Nav />
+            <div class="flex-grow">
+              <Router>
+                <Route path="/" component={Dashboard} />
+                <Route path="/rooms" component={() => <RoomsPage user={user} />} />
+                <Route path="/rooms/:roomId" component={() => <RoomDetails user={user} />} />
+                <Route path="/friends" component={() => <FriendsPage user={user} />} />
+                <Route path="/accountability" component={() => <AccountabilityPage user={user} />} />
+                <Route path="/profile" component={() => <ProfilePage user={user} />} />
+                <Route default component={Dashboard} />
+              </Router>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Login />
-      )}
-    </main>
+        ) : (
+          <Login />
+        )}
+      </main>
+    </LocationProvider>
   );
 }
