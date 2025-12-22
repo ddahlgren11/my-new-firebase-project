@@ -128,6 +128,30 @@ apiRouter.get('/users/:userId/rooms', async (req, res) => {
     res.json(rooms);
 });
 
+// Get Room by ID
+apiRouter.get('/rooms/:roomId', async (req, res) => {
+    const userId = getUserId(req);
+    const { roomId } = req.params;
+
+    const room = await roomRepo.getRoomById(roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    // Check membership
+    const members = await membershipRepo.getMembers(roomId);
+    const isMember = members.some(m => m.userId === userId);
+
+    if (!isMember) {
+        // If not a member, check if the room is public or something?
+        // For now, strict security: must be a member or owner.
+        // Owner is usually a member, but just in case:
+        if (room.ownerId !== userId) {
+            return res.status(403).json({ error: 'Access denied: You are not a member of this room.' });
+        }
+    }
+
+    res.json(room);
+});
+
 // Create Room
 apiRouter.post('/rooms', async (req, res) => {
     const userId = getUserId(req);

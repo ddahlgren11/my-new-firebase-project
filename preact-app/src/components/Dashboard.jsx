@@ -1,23 +1,23 @@
 import { h } from 'preact';
 
-export function Dashboard({ setActivePage }) {
+export function Dashboard() {
   const cards = [
     {
-      id: 'rooms',
+      href: '/rooms',
       title: 'Rooms',
       description: 'Join or create focus rooms to work together.',
       color: 'bg-indigo-500',
       icon: '🏠'
     },
     {
-      id: 'friends',
+      href: '/friends',
       title: 'Friends',
       description: 'See what your friends are up to and connect.',
       color: 'bg-emerald-500',
       icon: '👥'
     },
     {
-      id: 'accountability',
+      href: '/accountability',
       title: 'Accountability',
       description: 'Track progress and nudge your accountability partners.',
       color: 'bg-amber-500',
@@ -34,10 +34,10 @@ export function Dashboard({ setActivePage }) {
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         {cards.map((card) => (
-          <div
-            key={card.id}
-            onClick={() => setActivePage(card.id)}
-            class="bg-gray-800 rounded-xl overflow-hidden shadow-lg cursor-pointer transform transition duration-300 hover:scale-105 hover:shadow-2xl border border-gray-700"
+          <a
+            key={card.href}
+            href={card.href}
+            class="bg-gray-800 rounded-xl overflow-hidden shadow-lg cursor-pointer transform transition duration-300 hover:scale-105 hover:shadow-2xl border border-gray-700 block"
           >
             <div class={`${card.color} p-4 flex justify-center items-center h-24`}>
               <span class="text-5xl">{card.icon}</span>
@@ -49,7 +49,7 @@ export function Dashboard({ setActivePage }) {
                 Launch {card.title} <span class="ml-2">→</span>
               </div>
             </div>
-          </div>
+          </a>
         ))}
       </div>
     </div>

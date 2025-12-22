@@ -95,6 +95,11 @@ export const api = {
     // Endpoint: GET /users/me/rooms
     return await fetchApi('/users/me/rooms', { method: 'GET' });
   },
+
+  getRoom: async (roomId) => {
+    // Endpoint: GET /rooms/:roomId
+    return await fetchApi(`/rooms/${roomId}`, { method: 'GET' });
+  },
   
   createRoom: async (data) => {
     // Endpoint: POST /rooms
@@ -168,4 +173,17 @@ export const api = {
     console.warn("MOCK: getFriendActivity using placeholder data.");
     return { completedSessions: 5, nudgesReceived: 2 };
   },
+
+  trackProgress: async (roomId, sessionId, userId, data) => {
+    // Endpoint: POST /tasks
+    // Mapping trackProgress to createTask for compatibility based on TaskTracker usage.
+    // TaskTracker sends { task: "description" } in data.
+    return await fetchApi('/tasks', {
+      method: 'POST',
+      body: {
+        title: data.task,
+        roomId
+      }
+    });
+  }
 };
